@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>صدى للعطور — المخزون والطلبات</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+  #sada-app-root {
+    --bg: #1B1613;
+    --surface: #241E1A;
+    --surface-2: #2E2621;
+    --surface-3: #382E27;
+    --line: #3D332B;
+    --gold: #C9974C;
+    --gold-dim: #8A6B3C;
+    --rose: #B07687;
+    --cream: #F3EAD9;
+    --dim: #A99A85;
+    --success: #7A9A68;
+    --danger: #C1584D;
+    --warning: #D9A441;
+
+    font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--cream);
+    min-height: 100vh;
+    direction: rtl;
+    text-align: right;
+    box-sizing: border-box;
+    padding: 0;
+  }
+  #sada-app-root *, #sada-app-root *::before, #sada-app-root *::after { box-sizing: border-box; }
+  #sada-app-root button { font-family: inherit; cursor: pointer; }
+  #sada-app-root input, #sada-app-root select { font-family: inherit; }
+
+  .sada-shell { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+
+  /* ---- Header / signature ripple ---- */
+  .sada-header { position: relative; display: flex; align-items: center; gap: 18px; padding: 22px 26px; background: linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; margin-bottom: 26px; }
+  .sada-ripple-wrap { position: absolute; left: -30px; top: 50%; transform: translateY(-50%); width: 160px; height: 160px; opacity: 0.5; }
+  .sada-ripple-wrap svg circle { stroke: var(--gold); fill: none; }
+  .sada-brand { position: relative; z-index: 1; }
+  .sada-brand h1 { margin: 0; font-size: 30px; letter-spacing: 1px; color: var(--gold); font-weight: 700; }
+  .sada-brand p { margin: 4px 0 0; color: var(--dim); font-size: 13.5px; }
+  .sada-header-right { margin-inline-start: auto; position: relative; z-index: 1; text-align: left; direction: ltr; font-size: 12px; color: var(--dim); }
+
+  /* ---- Tabs ---- */
+  .sada-tabs { display: flex; gap: 8px; margin-bottom: 22px; border-bottom: 1px solid var(--line); }
+  .sada-tab { background: none; border: none; color: var(--dim); padding: 12px 18px; font-size: 15px; font-weight: 600; border-bottom: 2px solid transparent; transition: color .15s, border-color .15s; }
+  .sada-tab:hover { color: var(--cream); }
+  .sada-tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+
+  /* ---- Cards / dashboard ---- */
+  .sada-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 28px; }
+  .sada-stat { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+  .sada-stat .label { color: var(--dim); font-size: 12.5px; margin-bottom: 8px; }
+  .sada-stat .value { font-size: 26px; font-weight: 700; color: var(--cream); }
+  .sada-stat.warn .value { color: var(--warning); }
+  .sada-stat.danger .value { color: var(--danger); }
+
+  .sada-section-title { font-size: 17px; font-weight: 700; color: var(--gold); margin: 0 0 14px; }
+
+  /* ---- Panels ---- */
+  .sada-panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; margin-bottom: 20px; }
+  .sada-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .sada-search { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; color: var(--cream); padding: 8px 12px; font-size: 13.5px; min-width: 200px; }
+  .sada-search:focus { outline: none; border-color: var(--gold-dim); }
+
+  .sada-btn { background: var(--gold); color: #241A0E; border: none; border-radius: 8px; padding: 9px 16px; font-size: 13.5px; font-weight: 700; transition: filter .12s; }
+  .sada-btn:hover { filter: brightness(1.08); }
+  .sada-btn.secondary { background: var(--surface-3); color: var(--cream); border: 1px solid var(--line); }
+  .sada-btn.danger { background: var(--danger); color: #fff; }
+  .sada-btn.small { padding: 5px 10px; font-size: 12px; border-radius: 6px; }
+
+  /* ---- Table ---- */
+  .sada-table-wrap { overflow-x: auto; }
+  table.sada-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  table.sada-table th { text-align: right; color: var(--dim); font-weight: 600; padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  table.sada-table td { padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  table.sada-table tr:last-child td { border-bottom: none; }
+  table.sada-table tr:hover td { background: rgba(255,255,255,0.02); }
+  .sada-empty { text-align: center; color: var(--dim); padding: 30px 10px; font-size: 13.5px; }
+
+  .sada-pill { display: inline-block; padding: 3px 10px; border-radius: 100px; font-size: 11.5px; font-weight: 700; }
+  .pill-ok { background: rgba(122,154,104,0.18); color: var(--success); }
+  .pill-warn { background: rgba(217,164,65,0.18); color: var(--warning); }
+  .pill-danger { background: rgba(193,88,77,0.18); color: var(--danger); }
+  .pill-dim { background: rgba(169,154,133,0.15); color: var(--dim); }
+
+  /* ---- Form ---- */
+  .sada-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 14px; }
+  .sada-field label { display: block; font-size: 12px; color: var(--dim); margin-bottom: 5px; }
+  .sada-field input, .sada-field select { width: 100%; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; color: var(--cream); padding: 9px 10px; font-size: 13.5px; }
+  .sada-field input:focus, .sada-field select:focus { outline: none; border-color: var(--gold-dim); }
+  .sada-form-actions { display: flex; gap: 10px; justify-content: flex-start; }
+
+  .sada-row-actions { display: flex; gap: 6px; }
+  .sada-name-cell { font-weight: 600; }
+  .sada-muted { color: var(--dim); }
+
+  .sada-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--surface-3); border: 1px solid var(--gold-dim); color: var(--cream); padding: 10px 18px; border-radius: 100px; font-size: 13px; z-index: 999; box-shadow: 0 6px 24px rgba(0,0,0,0.4); }
+
+  @media (max-width: 640px) {
+    .sada-header { flex-direction: column; align-items: flex-start; }
+    .sada-header-right { margin-inline-start: 0; text-align: right; direction: rtl; }
+    .sada-ripple-wrap { display: none; }
+  }
+
+  /* ---- Login ---- */
+  .sada-login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .sada-login-card { width: 100%; max-width: 380px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 32px 28px; text-align: center; }
+  .sada-login-card h1 { color: var(--gold); font-size: 26px; margin: 0 0 4px; }
+  .sada-login-card p { color: var(--dim); font-size: 13px; margin: 0 0 24px; }
+  .sada-login-card .sada-field { text-align: right; margin-bottom: 14px; }
+  .sada-login-card button[type="submit"] { width: 100%; padding: 11px; font-size: 14px; margin-top: 6px; }
+  .sada-login-error { color: var(--danger); font-size: 13px; margin-top: 10px; min-height: 18px; }
+  .sada-user-bar { display: flex; align-items: center; gap: 10px; }
+</style>
+
+</head>
+<body>
+<div id="sada-app-root">
+
+  <div id="sada-login-screen" class="sada-login-wrap">
+    <div class="sada-login-card">
+      <h1>صدى للعطور</h1>
+      <p>سجّل الدخول للوصول لأداة المخزون والطلبات</p>
+      <form id="sada-login-form">
+        <div class="sada-field"><label>البريد الإلكتروني</label><input type="email" name="email" required placeholder="you@example.com" /></div>
+        <div class="sada-field"><label>كلمة المرور</label><input type="password" name="password" required placeholder="••••••••" /></div>
+        <button type="submit" class="sada-btn">دخول</button>
+        <div class="sada-login-error" id="sada-login-error"></div>
+      </form>
+    </div>
+  </div>
+
+  <div id="sada-main-app" style="display:none;">
+    <div class="sada-shell" id="sada-root-inner">
+      <div style="padding:60px 0; text-align:center; color:#A99A85;">جارٍ التحميل...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  // ====== CONFIGURE THESE TWO VALUES FROM YOUR SUPABASE PROJECT ======
+  const SUPABASE_URL = 'omnbbsqeoipykujmlpuy';
+  const SUPABASE_ANON_KEY = 'eu-west-1';
+  // =====================================================================
+
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  let state = { items: [], orders: [] };
+  let ui = { tab: 'dashboard', invSearch: '', invEditing: null, invFormOpen: false, ordFormOpen: false, ordEditing: null };
+  let toastTimer = null;
+  let currentUser = null;
+
+  const root = document.getElementById('sada-root-inner');
+  const appRoot = document.getElementById('sada-app-root');
+  const loginScreen = document.getElementById('sada-login-screen');
+  const mainApp = document.getElementById('sada-main-app');
+
+  const STATUS_LABELS = {
+    new: 'جديد', processing: 'قيد التجهيز', shipped: 'تم الشحن', delivered: 'تم التسليم', cancelled: 'ملغي'
+  };
+  const STATUS_PILL = {
+    new: 'pill-dim', processing: 'pill-warn', shipped: 'pill-ok', delivered: 'pill-ok', cancelled: 'pill-danger'
+  };
+
+  function fmt(n) {
+    n = Number(n) || 0;
+    return n.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  }
+
+  // ---------- Auth ----------
+  const loginForm = document.getElementById('sada-login-form');
+  const loginError = document.getElementById('sada-login-error');
+  loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    loginError.textContent = '';
+    const fd = new FormData(loginForm);
+    const email = fd.get('email').trim();
+    const password = fd.get('password');
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) {
+      loginError.textContent = 'بيانات الدخول غير صحيحة. تأكد من الإيميل وكلمة المرور.';
+    }
+  });
+
+  async function signOut() {
+    await sb.auth.signOut();
+  }
+
+  sb.auth.onAuthStateChange((event, session) => {
+    if (session && session.user) {
+      currentUser = session.user;
+      loginScreen.style.display = 'none';
+      mainApp.style.display = 'block';
+      loadData();
+      subscribeRealtime();
+    } else {
+      currentUser = null;
+      mainApp.style.display = 'none';
+      loginScreen.style.display = 'flex';
+    }
+  });
+
+  let realtimeSubscribed = false;
+  function subscribeRealtime() {
+    if (realtimeSubscribed) return;
+    realtimeSubscribed = true;
+    sb.channel('sada-db-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'items' }, () => { loadData(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => { loadData(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, () => { loadData(); })
+      .subscribe();
+  }
+
+  // ---------- Data layer (Supabase) ----------
+  async function loadData() {
+    try {
+      const [itemsRes, ordersRes] = await Promise.all([
+        sb.from('items').select('*').order('name', { ascending: true }),
+        sb.from('orders').select('*, order_items(*)').order('date', { ascending: false }),
+      ]);
+      if (itemsRes.error) throw itemsRes.error;
+      if (ordersRes.error) throw ordersRes.error;
+
+      state.items = (itemsRes.data || []).map(i => ({
+        id: i.id, name: i.name, size: i.size || '', stock: Number(i.stock) || 0,
+        lowStock: Number(i.low_stock) || 0, costPrice: Number(i.cost_price) || 0, salePrice: Number(i.sale_price) || 0,
+      }));
+
+      state.orders = (ordersRes.data || []).map(o => ({
+        id: o.id, customerName: o.customer_name, status: o.status, date: o.date, notes: o.notes || '',
+        total: Number(o.total) || 0,
+        items: (o.order_items || []).map(li => ({
+          id: li.id, itemId: li.item_id, itemName: li.item_name, qty: Number(li.qty) || 0,
+          unitPrice: Number(li.unit_price) || 0, lineTotal: Number(li.line_total) || 0,
+        })),
+      }));
+    } catch (e) {
+      showToast('تعذر تحميل البيانات: ' + (e.message || 'خطأ غير معروف'));
+    }
+    render();
+  }
+
+  function showToast(msg) {
+    clearTimeout(toastTimer);
+    let t = document.getElementById('sada-toast');
+    if (!t) {
+      t = document.createElement('div');
+      t.id = 'sada-toast';
+      t.className = 'sada-toast';
+      document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.style.display = 'block';
+    toastTimer = setTimeout(() => { t.style.display = 'none'; }, 2200);
+  }
+
+  // ---------- Header ----------
+  function renderHeader() {
+    return `
+      <div class="sada-header">
+        <div class="sada-ripple-wrap">
+          <svg viewBox="0 0 160 160" width="160" height="160">
+            <circle cx="30" cy="80" r="14" stroke-width="2">
+              <animate attributeName="r" values="14;70;14" dur="6s" repeatCount="indefinite" />
+              <animate attributeName="opacity" values="0.9;0;0.9" dur="6s" repeatCount="indefinite" />
+            </circle>
+            <circle cx="30" cy="80" r="30" stroke-width="1.5">
+              <animate attributeName="r" values="30;85;30" dur="6s" begin="1s" repeatCount="indefinite" />
+              <animate attributeName="opacity" values="0.7;0;0.7" dur="6s" begin="1s" repeatCount="indefinite" />
+            </circle>
+            <circle cx="30" cy="80" r="46" stroke-width="1">
+              <animate attributeName="r" values="46;100;46" dur="6s" begin="2s" repeatCount="indefinite" />
+              <animate attributeName="opacity" values="0.5;0;0.5" dur="6s" begin="2s" repeatCount="indefinite" />
+            </circle>
+          </svg>
+        </div>
+        <div class="sada-brand">
+          <h1>صدى للعطور</h1>
+          <p>إدارة المخزون والطلبات</p>
+        </div>
+        <div class="sada-header-right">
+          <div class="sada-user-bar">
+            <span>${currentUser ? escapeHtml(currentUser.email) : ''}</span>
+            <button class="sada-btn secondary small" id="sada-logout-btn">خروج</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderTabs() {
+    const tabs = [ ['dashboard','لوحة العرض'], ['inventory','المخزون'], ['orders','الطلبات'] ];
+    return `<div class="sada-tabs">` + tabs.map(([key,label]) =>
+      `<button class="sada-tab ${ui.tab===key?'active':''}" data-tab="${key}">${label}</button>`
+    ).join('') + `</div>`;
+  }
+
+  // ---------- Dashboard ----------
+  function renderDashboard() {
+    const totalSkus = state.items.length;
+    const totalUnits = state.items.reduce((s,i) => s + Number(i.stock||0), 0);
+    const invValue = state.items.reduce((s,i) => s + Number(i.stock||0) * Number(i.costPrice||0), 0);
+    const lowStock = state.items.filter(i => Number(i.stock) <= Number(i.lowStock||0));
+    const pendingOrders = state.orders.filter(o => o.status === 'new' || o.status === 'processing');
+
+    return `
+      <div class="sada-grid">
+        <div class="sada-stat"><div class="label">عدد الأصناف</div><div class="value">${totalSkus}</div></div>
+        <div class="sada-stat"><div class="label">إجمالي الوحدات بالمخزون</div><div class="value">${fmt(totalUnits)}</div></div>
+        <div class="sada-stat"><div class="label">قيمة المخزون (تكلفة)</div><div class="value">${fmt(invValue)}</div></div>
+        <div class="sada-stat ${lowStock.length ? 'warn' : ''}"><div class="label">أصناف منخفضة المخزون</div><div class="value">${lowStock.length}</div></div>
+        <div class="sada-stat ${pendingOrders.length ? 'warn' : ''}"><div class="label">طلبات قيد التنفيذ</div><div class="value">${pendingOrders.length}</div></div>
+      </div>
+
+      <div class="sada-panel">
+        <div class="sada-panel-head"><h3 class="sada-section-title" style="margin:0;">تنبيهات المخزون المنخفض</h3></div>
+        ${lowStock.length === 0 ? `<div class="sada-empty">لا توجد أصناف منخفضة حالياً.</div>` : `
+          <div class="sada-table-wrap"><table class="sada-table">
+            <thead><tr><th>الصنف</th><th>المتوفر</th><th>الحد الأدنى</th></tr></thead>
+            <tbody>${lowStock.map(i => `<tr><td class="sada-name-cell">${escapeHtml(i.name)} ${i.size?`<span class="sada-muted">(${escapeHtml(i.size)})</span>`:''}</td><td>${fmt(i.stock)}</td><td>${fmt(i.lowStock)}</td></tr>`).join('')}</tbody>
+          </table></div>
+        `}
+      </div>
+
+      <div class="sada-panel">
+        <div class="sada-panel-head"><h3 class="sada-section-title" style="margin:0;">أحدث الطلبات</h3></div>
+        ${state.orders.length === 0 ? `<div class="sada-empty">لا توجد طلبات بعد.</div>` : `
+          <div class="sada-table-wrap"><table class="sada-table">
+            <thead><tr><th>العميل</th><th>الأصناف</th><th>الإجمالي</th><th>الحالة</th><th>التاريخ</th></tr></thead>
+            <tbody>${[...state.orders].sort((a,b)=> (b.date||'').localeCompare(a.date||'')).slice(0,6).map(o => `
+              <tr>
+                <td>${escapeHtml(o.customerName)}</td>
+                <td>${getOrderItems(o).map(l => `${escapeHtml(l.itemName)} × ${fmt(l.qty)}`).join('<br>')}</td>
+                <td>${fmt(o.total)}</td>
+                <td><span class="sada-pill ${STATUS_PILL[o.status]||'pill-dim'}">${STATUS_LABELS[o.status]||o.status}</span></td>
+                <td class="sada-muted">${o.date||''}</td>
+              </tr>
+            `).join('')}</tbody>
+          </table></div>
+        `}
+      </div>
+    `;
+  }
+
+  // ---------- Inventory ----------
+  function renderInventory() {
+    const search = ui.invSearch.trim().toLowerCase();
+    const filtered = state.items.filter(i => !search || i.name.toLowerCase().includes(search));
+    const editing = ui.invEditing ? state.items.find(i => i.id === ui.invEditing) : null;
+
+    return `
+      <div class="sada-panel">
+        <div class="sada-panel-head">
+          <h3 class="sada-section-title" style="margin:0;">أصناف المخزون</h3>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <input class="sada-search" id="inv-search" placeholder="بحث عن صنف..." value="${escapeAttr(ui.invSearch)}" />
+            <button class="sada-btn secondary" id="inv-template-btn">تنزيل نموذج إكسل</button>
+            <button class="sada-btn secondary" id="inv-import-btn">استيراد من إكسل</button>
+            <input type="file" id="inv-import-input" accept=".xlsx,.xls" style="display:none" />
+            <button class="sada-btn" id="inv-add-btn">${ui.invFormOpen && !ui.invEditing ? 'إغلاق' : '+ إضافة صنف'}</button>
+          </div>
+        </div>
+        <div class="sada-muted" style="font-size:12px; margin:-6px 0 14px;">الاستيراد بيضيف الكميات لأي صنف موجود بنفس الاسم والحجم، ويُنشئ صنف جديد لو مش موجود.</div>
+
+        ${(ui.invFormOpen || editing) ? renderInventoryForm(editing) : ''}
+
+        <div class="sada-table-wrap">
+          ${filtered.length === 0 ? `<div class="sada-empty">${state.items.length===0 ? 'لا توجد أصناف بعد — أضف أول صنف للبدء.' : 'لا توجد نتائج مطابقة.'}</div>` : `
+          <table class="sada-table">
+            <thead><tr><th>الصنف</th><th>الحجم</th><th>المتوفر</th><th>الحد الأدنى</th><th>سعر التكلفة</th><th>سعر البيع</th><th>الحالة</th><th></th></tr></thead>
+            <tbody>
+              ${filtered.map(i => {
+                const low = Number(i.stock) <= Number(i.lowStock||0);
+                const out = Number(i.stock) <= 0;
+                const pill = out ? '<span class="sada-pill pill-danger">نفد</span>' : (low ? '<span class="sada-pill pill-warn">منخفض</span>' : '<span class="sada-pill pill-ok">متوفر</span>');
+                return `<tr>
+                  <td class="sada-name-cell">${escapeHtml(i.name)}</td>
+                  <td class="sada-muted">${escapeHtml(i.size||'-')}</td>
+                  <td>${fmt(i.stock)}</td>
+                  <td class="sada-muted">${fmt(i.lowStock)}</td>
+                  <td>${fmt(i.costPrice)}</td>
+                  <td>${fmt(i.salePrice)}</td>
+                  <td>${pill}</td>
+                  <td>
+                    <div class="sada-row-actions">
+                      <button class="sada-btn secondary small" data-inv-edit="${i.id}">تعديل</button>
+                      <button class="sada-btn danger small" data-inv-del="${i.id}">حذف</button>
+                    </div>
+                  </td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+          `}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderInventoryForm(editing) {
+    const v = editing || { name:'', size:'', stock:0, lowStock:5, costPrice:0, salePrice:0 };
+    return `
+      <form id="inv-form" style="background:var(--surface-2); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px;">
+        <div class="sada-form-grid">
+          <div class="sada-field"><label>اسم الصنف *</label><input name="name" required value="${escapeAttr(v.name)}" placeholder="مثال: عود ملكي" /></div>
+          <div class="sada-field"><label>الحجم</label><input name="size" value="${escapeAttr(v.size)}" placeholder="مثال: 50 مل" /></div>
+          <div class="sada-field"><label>الكمية المتوفرة</label><input name="stock" type="number" step="1" min="0" value="${v.stock}" /></div>
+          <div class="sada-field"><label>حد التنبيه للمخزون المنخفض</label><input name="lowStock" type="number" step="1" min="0" value="${v.lowStock}" /></div>
+          <div class="sada-field"><label>سعر التكلفة</label><input name="costPrice" type="number" step="0.01" min="0" value="${v.costPrice}" /></div>
+          <div class="sada-field"><label>سعر البيع</label><input name="salePrice" type="number" step="0.01" min="0" value="${v.salePrice}" /></div>
+        </div>
+        <div class="sada-form-actions">
+          <button type="submit" class="sada-btn">${editing ? 'حفظ التعديلات' : 'إضافة الصنف'}</button>
+          <button type="button" class="sada-btn secondary" id="inv-form-cancel">إلغاء</button>
+        </div>
+      </form>
+    `;
+  }
+
+  // ---------- Orders ----------
+  function getOrderItems(order) {
+    if (order.items && order.items.length) return order.items;
+    // legacy single-item order format
+    return [{ itemId: order.itemId, itemName: order.itemName, qty: order.qty, unitPrice: order.unitPrice, lineTotal: order.total }];
+  }
+
+  function renderOrders() {
+    const editing = ui.ordEditing ? state.orders.find(o => o.id === ui.ordEditing) : null;
+    const sorted = [...state.orders].sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+
+    return `
+      <div class="sada-panel">
+        <div class="sada-panel-head">
+          <h3 class="sada-section-title" style="margin:0;">الطلبات</h3>
+          <button class="sada-btn" id="ord-add-btn">${ui.ordFormOpen && !ui.ordEditing ? 'إغلاق' : '+ طلب جديد'}</button>
+        </div>
+
+        ${(ui.ordFormOpen || editing) ? renderOrderForm(editing) : ''}
+
+        <div class="sada-table-wrap">
+          ${sorted.length === 0 ? `<div class="sada-empty">لا توجد طلبات بعد — أضف أول طلب للبدء.</div>` : `
+          <table class="sada-table">
+            <thead><tr><th>العميل</th><th>الأصناف</th><th>الإجمالي</th><th>الحالة</th><th>التاريخ</th><th></th></tr></thead>
+            <tbody>
+              ${sorted.map(o => {
+                const lines = getOrderItems(o);
+                return `
+                <tr>
+                  <td class="sada-name-cell">${escapeHtml(o.customerName)}</td>
+                  <td>${lines.map(l => `${escapeHtml(l.itemName)} <span class="sada-muted">× ${fmt(l.qty)}</span>`).join('<br>')}</td>
+                  <td>${fmt(o.total)}</td>
+                  <td>
+                    <select data-ord-status="${o.id}" class="sada-search" style="min-width:120px; padding:5px 8px; font-size:12px;">
+                      ${Object.keys(STATUS_LABELS).map(s => `<option value="${s}" ${s===o.status?'selected':''}>${STATUS_LABELS[s]}</option>`).join('')}
+                    </select>
+                  </td>
+                  <td class="sada-muted">${o.date||''}</td>
+                  <td>
+                    <div class="sada-row-actions">
+                      <button class="sada-btn secondary small" data-ord-edit="${o.id}">تعديل</button>
+                      <button class="sada-btn danger small" data-ord-del="${o.id}">حذف</button>
+                    </div>
+                  </td>
+                </tr>
+              `;
+              }).join('')}
+            </tbody>
+          </table>
+          `}
+        </div>
+      </div>
+    `;
+  }
+
+  function itemOptionsHtml(selectedId) {
+    const opts = state.items.map(i => `<option value="${i.id}" ${i.id===selectedId?'selected':''}>${escapeHtml(i.name)}${i.size?' - '+escapeHtml(i.size):''} (متوفر: ${fmt(i.stock)})</option>`).join('');
+    return `<option value="">اختر صنف</option>${opts}`;
+  }
+
+  function orderLineRowHtml(itemId, qty) {
+    return `
+      <div class="ord-line" style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+        <select name="lineItemId" style="flex:2;" ${state.items.length===0?'disabled':''}>${itemOptionsHtml(itemId||'')}</select>
+        <input name="lineQty" type="number" min="1" step="1" value="${qty||1}" style="flex:1; max-width:90px;" />
+        <button type="button" class="sada-btn danger small ord-line-remove">حذف</button>
+      </div>
+    `;
+  }
+
+  function renderOrderForm(editing) {
+    const v = editing || { customerName:'', status:'new', date: new Date().toISOString().slice(0,10), notes:'' };
+    const lines = editing ? getOrderItems(editing) : [{ itemId:'', qty:1 }];
+    return `
+      <form id="ord-form" style="background:var(--surface-2); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px;">
+        ${state.items.length === 0 ? `<div class="sada-muted" style="margin-bottom:10px; font-size:13px;">أضف أصنافاً في المخزون أولاً قبل إنشاء طلب.</div>` : ''}
+        <div class="sada-form-grid">
+          <div class="sada-field"><label>اسم العميل *</label><input name="customerName" required value="${escapeAttr(v.customerName)}" placeholder="اسم العميل" /></div>
+          <div class="sada-field"><label>الحالة</label><select name="status">${Object.keys(STATUS_LABELS).map(s => `<option value="${s}" ${s===v.status?'selected':''}>${STATUS_LABELS[s]}</option>`).join('')}</select></div>
+          <div class="sada-field"><label>التاريخ</label><input name="date" type="date" value="${v.date}" /></div>
+          <div class="sada-field"><label>ملاحظات</label><input name="notes" value="${escapeAttr(v.notes||'')}" placeholder="اختياري" /></div>
+        </div>
+
+        <div style="margin-bottom:6px;">
+          <label style="display:block; font-size:12px; color:var(--dim); margin-bottom:8px;">أصناف الطلب *</label>
+          <div id="ord-lines">
+            ${lines.map(l => orderLineRowHtml(l.itemId, l.qty)).join('')}
+          </div>
+          <button type="button" class="sada-btn secondary small" id="ord-add-line" ${state.items.length===0?'disabled':''}>+ إضافة صنف للطلب</button>
+        </div>
+
+        <div class="sada-form-actions" style="margin-top:14px;">
+          <button type="submit" class="sada-btn" ${state.items.length===0?'disabled':''}>${editing ? 'حفظ التعديلات' : 'إضافة الطلب'}</button>
+          <button type="button" class="sada-btn secondary" id="ord-form-cancel">إلغاء</button>
+        </div>
+        ${!editing ? `<div class="sada-muted" style="margin-top:8px; font-size:12px;">سيتم خصم الكميات تلقائياً من المخزون لكل صنف في الطلب.</div>` : `<div class="sada-muted" style="margin-top:8px; font-size:12px;">ملاحظة: تعديل الطلب لا يغيّر المخزون تلقائياً؛ عدّل المخزون يدوياً إذا لزم.</div>`}
+      </form>
+    `;
+  }
+
+  function downloadTemplate() {
+    const headers = ['اسم الصنف', 'الحجم', 'الكمية', 'الحد الأدنى للتنبيه', 'سعر التكلفة', 'سعر البيع'];
+    const example = ['عود ملكي', '50 مل', 20, 5, 45, 90];
+    const ws = XLSX.utils.aoa_to_sheet([headers, example]);
+    ws['!cols'] = headers.map(() => ({ wch: 20 }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'المخزون');
+    XLSX.writeFile(wb, 'نموذج-مخزون-صدى.xlsx');
+  }
+
+  function normalizeKey(k) {
+    return String(k || '').trim().toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/\s+/g, '');
+  }
+
+  const HEADER_MAP = {
+    name: ['اسمالصنف', 'اسم', 'name', 'item', 'product'],
+    size: ['الحجم', 'size'],
+    stock: ['الكميه', 'المخزون', 'stock', 'qty', 'quantity'],
+    lowStock: ['الحدالادنىللتنبيه', 'الحدالادنى', 'حدالتنبيه', 'lowstock', 'min', 'threshold'],
+    costPrice: ['سعرالتكلفه', 'التكلفه', 'cost', 'costprice'],
+    salePrice: ['سعرالبيع', 'البيع', 'price', 'saleprice', 'sale'],
+  };
+
+  function matchField(normalizedKey) {
+    for (const field in HEADER_MAP) {
+      if (HEADER_MAP[field].includes(normalizedKey)) return field;
+    }
+    return null;
+  }
+
+  function importExcel(file) {
+    if (typeof XLSX === 'undefined') {
+      showToast('تعذر تحميل مكتبة الإكسل، تحقق من الاتصال بالإنترنت');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const wb = XLSX.read(e.target.result, { type: 'array' });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+        if (!rows.length) { showToast('الملف فارغ أو بدون بيانات'); return; }
+
+        let added = 0, updated = 0, skipped = 0;
+        for (const row of rows) {
+          const mapped = {};
+          Object.keys(row).forEach(k => {
+            const field = matchField(normalizeKey(k));
+            if (field) mapped[field] = row[k];
+          });
+          const name = String(mapped.name || '').trim();
+          if (!name) { skipped++; continue; }
+          const size = String(mapped.size || '').trim();
+          const stock = Number(mapped.stock) || 0;
+          const lowStock = mapped.lowStock !== undefined && mapped.lowStock !== '' ? Number(mapped.lowStock) : null;
+          const costPrice = mapped.costPrice !== undefined && mapped.costPrice !== '' ? Number(mapped.costPrice) : null;
+          const salePrice = mapped.salePrice !== undefined && mapped.salePrice !== '' ? Number(mapped.salePrice) : null;
+
+          const existing = state.items.find(i => i.name.trim().toLowerCase() === name.toLowerCase() && (i.size||'').trim().toLowerCase() === size.toLowerCase());
+          if (existing) {
+            const patch = { stock: Number(existing.stock) + stock };
+            if (lowStock !== null) patch.low_stock = lowStock;
+            if (costPrice !== null) patch.cost_price = costPrice;
+            if (salePrice !== null) patch.sale_price = salePrice;
+            const { error } = await sb.from('items').update(patch).eq('id', existing.id);
+            if (!error) { existing.stock = patch.stock; updated++; }
+          } else {
+            const { data, error } = await sb.from('items').insert({
+              name, size, stock,
+              low_stock: lowStock !== null ? lowStock : 5,
+              cost_price: costPrice !== null ? costPrice : 0,
+              sale_price: salePrice !== null ? salePrice : 0,
+            }).select().single();
+            if (!error && data) {
+              state.items.push({ id: data.id, name, size, stock, lowStock: data.low_stock, costPrice: data.cost_price, salePrice: data.sale_price });
+              added++;
+            }
+          }
+        }
+
+        render();
+        showToast(`تم الاستيراد: ${added} صنف جديد، ${updated} صنف تم تحديثه${skipped ? `، تم تجاهل ${skipped} صف بدون اسم` : ''}`);
+      } catch (err) {
+        showToast('تعذر قراءة الملف، تأكد أنه بصيغة إكسل صحيحة');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function escapeAttr(s) { return escapeHtml(s); }
+
+  // ---------- Main render ----------
+  function render() {
+    let body = '';
+    if (ui.tab === 'dashboard') body = renderDashboard();
+    else if (ui.tab === 'inventory') body = renderInventory();
+    else body = renderOrders();
+
+    root.innerHTML = renderHeader() + renderTabs() + body;
+    attachEvents();
+  }
+
+  function attachEvents() {
+    root.querySelectorAll('[data-tab]').forEach(btn => {
+      btn.addEventListener('click', () => { ui.tab = btn.getAttribute('data-tab'); render(); });
+    });
+
+    const logoutBtn = root.querySelector('#sada-logout-btn');
+    if (logoutBtn) logoutBtn.addEventListener('click', signOut);
+
+    // Inventory
+    const invTemplateBtn = root.querySelector('#inv-template-btn');
+    if (invTemplateBtn) invTemplateBtn.addEventListener('click', downloadTemplate);
+    const invImportBtn = root.querySelector('#inv-import-btn');
+    const invImportInput = root.querySelector('#inv-import-input');
+    if (invImportBtn && invImportInput) {
+      invImportBtn.addEventListener('click', () => invImportInput.click());
+      invImportInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) importExcel(file);
+        invImportInput.value = '';
+      });
+    }
+    const invAddBtn = root.querySelector('#inv-add-btn');
+    if (invAddBtn) invAddBtn.addEventListener('click', () => {
+      ui.invEditing = null;
+      ui.invFormOpen = !ui.invFormOpen;
+      render();
+    });
+    const invSearch = root.querySelector('#inv-search');
+    if (invSearch) invSearch.addEventListener('input', (e) => { ui.invSearch = e.target.value; render(); invSearchFocusFix(); });
+    const invCancel = root.querySelector('#inv-form-cancel');
+    if (invCancel) invCancel.addEventListener('click', () => { ui.invFormOpen = false; ui.invEditing = null; render(); });
+    const invForm = root.querySelector('#inv-form');
+    if (invForm) invForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(invForm);
+      const name = fd.get('name').trim();
+      if (!name) return;
+      const payload = {
+        name,
+        size: fd.get('size').trim(),
+        stock: Number(fd.get('stock')) || 0,
+        low_stock: Number(fd.get('lowStock')) || 0,
+        cost_price: Number(fd.get('costPrice')) || 0,
+        sale_price: Number(fd.get('salePrice')) || 0,
+      };
+      let error;
+      if (ui.invEditing) {
+        ({ error } = await sb.from('items').update(payload).eq('id', ui.invEditing));
+        if (!error) showToast('تم حفظ التعديلات');
+      } else {
+        ({ error } = await sb.from('items').insert(payload));
+        if (!error) showToast('تمت إضافة الصنف');
+      }
+      if (error) { showToast('حصل خطأ: ' + error.message); return; }
+      ui.invFormOpen = false; ui.invEditing = null;
+      await loadData();
+    });
+    root.querySelectorAll('[data-inv-edit]').forEach(btn => btn.addEventListener('click', () => {
+      ui.invEditing = btn.getAttribute('data-inv-edit'); ui.invFormOpen = true; render();
+    }));
+    root.querySelectorAll('[data-inv-del]').forEach(btn => btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-inv-del');
+      if (confirm('هل تريد حذف هذا الصنف؟')) {
+        const { error } = await sb.from('items').delete().eq('id', id);
+        if (error) { showToast('تعذر الحذف: ' + error.message); return; }
+        showToast('تم حذف الصنف');
+        await loadData();
+      }
+    }));
+
+    // Orders
+    const ordAddBtn = root.querySelector('#ord-add-btn');
+    if (ordAddBtn) ordAddBtn.addEventListener('click', () => {
+      ui.ordEditing = null; ui.ordFormOpen = !ui.ordFormOpen; render();
+    });
+    const ordCancel = root.querySelector('#ord-form-cancel');
+    if (ordCancel) ordCancel.addEventListener('click', () => { ui.ordFormOpen = false; ui.ordEditing = null; render(); });
+    const ordForm = root.querySelector('#ord-form');
+    const ordLines = root.querySelector('#ord-lines');
+    const ordAddLine = root.querySelector('#ord-add-line');
+    if (ordAddLine && ordLines) ordAddLine.addEventListener('click', () => {
+      ordLines.insertAdjacentHTML('beforeend', orderLineRowHtml('', 1));
+    });
+    if (ordLines) ordLines.addEventListener('click', (e) => {
+      if (e.target.classList.contains('ord-line-remove')) {
+        const rows = ordLines.querySelectorAll('.ord-line');
+        if (rows.length > 1) e.target.closest('.ord-line').remove();
+        else showToast('لازم يبقى صنف واحد على الأقل في الطلب');
+      }
+    });
+    if (ordForm) ordForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(ordForm);
+      const customerName = fd.get('customerName').trim();
+      if (!customerName) return;
+      const itemIds = fd.getAll('lineItemId');
+      const qtys = fd.getAll('lineQty');
+      const lines = [];
+      for (let i = 0; i < itemIds.length; i++) {
+        const itemId = itemIds[i];
+        const qty = Number(qtys[i]) || 0;
+        if (!itemId || qty <= 0) continue;
+        const item = state.items.find(it => it.id === itemId);
+        if (!item) continue;
+        lines.push({ itemId: item.id, itemName: item.name + (item.size ? ' - ' + item.size : ''), qty, unitPrice: Number(item.salePrice) || 0, lineTotal: qty * (Number(item.salePrice) || 0) });
+      }
+      if (lines.length === 0) { showToast('اختر صنف واحد على الأقل بكمية صحيحة'); return; }
+      const total = lines.reduce((s, l) => s + l.lineTotal, 0);
+      const status = fd.get('status'), date = fd.get('date'), notes = fd.get('notes');
+
+      if (ui.ordEditing) {
+        const orderId = ui.ordEditing;
+        const { error: updErr } = await sb.from('orders').update({ customer_name: customerName, status, date, notes, total }).eq('id', orderId);
+        if (updErr) { showToast('حصل خطأ: ' + updErr.message); return; }
+        await sb.from('order_items').delete().eq('order_id', orderId);
+        const { error: liErr } = await sb.from('order_items').insert(lines.map(l => ({
+          order_id: orderId, item_id: l.itemId, item_name: l.itemName, qty: l.qty, unit_price: l.unitPrice, line_total: l.lineTotal,
+        })));
+        if (liErr) { showToast('حصل خطأ: ' + liErr.message); return; }
+        showToast('تم حفظ تعديلات الطلب');
+      } else {
+        const shortages = lines.filter(l => {
+          const item = state.items.find(it => it.id === l.itemId);
+          return item && Number(item.stock) < l.qty;
+        });
+        if (shortages.length) {
+          if (!confirm('الكمية المطلوبة أكبر من المتوفر لهذه الأصناف: ' + shortages.map(s => s.itemName).join('، ') + '. هل تريد المتابعة على أي حال؟')) return;
+        }
+        const { data: newOrder, error: insErr } = await sb.from('orders').insert({ customer_name: customerName, status, date, notes, total }).select().single();
+        if (insErr || !newOrder) { showToast('حصل خطأ: ' + (insErr ? insErr.message : '')); return; }
+        const { error: liErr } = await sb.from('order_items').insert(lines.map(l => ({
+          order_id: newOrder.id, item_id: l.itemId, item_name: l.itemName, qty: l.qty, unit_price: l.unitPrice, line_total: l.lineTotal,
+        })));
+        if (liErr) { showToast('حصل خطأ: ' + liErr.message); return; }
+        for (const l of lines) {
+          const item = state.items.find(it => it.id === l.itemId);
+          await sb.from('items').update({ stock: Number(item.stock) - l.qty }).eq('id', l.itemId);
+        }
+        showToast('تمت إضافة الطلب وخصم الكميات من المخزون');
+      }
+      ui.ordFormOpen = false; ui.ordEditing = null;
+      await loadData();
+    });
+    root.querySelectorAll('[data-ord-edit]').forEach(btn => btn.addEventListener('click', () => {
+      ui.ordEditing = btn.getAttribute('data-ord-edit'); ui.ordFormOpen = true; render();
+    }));
+    root.querySelectorAll('[data-ord-del]').forEach(btn => btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-ord-del');
+      if (confirm('هل تريد حذف هذا الطلب؟ (لن يتم إرجاع الكمية للمخزون تلقائياً)')) {
+        const { error } = await sb.from('orders').delete().eq('id', id);
+        if (error) { showToast('تعذر الحذف: ' + error.message); return; }
+        showToast('تم حذف الطلب');
+        await loadData();
+      }
+    }));
+    root.querySelectorAll('[data-ord-status]').forEach(sel => sel.addEventListener('change', async () => {
+      const id = sel.getAttribute('data-ord-status');
+      const { error } = await sb.from('orders').update({ status: sel.value }).eq('id', id);
+      if (error) { showToast('تعذر التحديث: ' + error.message); return; }
+      showToast('تم تحديث حالة الطلب');
+      await loadData();
+    }));
+  }
+
+  function invSearchFocusFix() {
+    const el = root.querySelector('#inv-search');
+    if (el) { el.focus(); el.selectionStart = el.selectionEnd = el.value.length; }
+  }
+})();
+</script>
+</body>
+</html>

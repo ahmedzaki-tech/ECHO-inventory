@@ -177,18 +177,17 @@
   // ---------- Auth ----------
   const loginForm = document.getElementById('sada-login-form');
   const loginError = document.getElementById('sada-login-error');
-  loginForm.addEventListener('submit', async (e) => {
+    loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    loginError.textContent = 'خطأ: ' + error.message + ' (code: ' + (error.status || error.code || 'n/a') + ')';
+    loginError.textContent = '';
     const fd = new FormData(loginForm);
     const email = fd.get('email').trim();
     const password = fd.get('password');
-    const { error } = await sb.auth.signInWithPassword({ email, password });
-    if (error) {
-      loginError.textContent = 'بيانات الدخول غير صحيحة. تأكد من الإيميل وكلمة المرور.';
+    const result = await sb.auth.signInWithPassword({ email, password });
+    if (result.error) {
+      loginError.textContent = 'خطأ: ' + result.error.message;
     }
   });
-
   async function signOut() {
     await sb.auth.signOut();
   }

@@ -146,13 +146,13 @@
 <script>
 (function() {
   // ====== CONFIGURE THESE TWO VALUES FROM YOUR SUPABASE PROJECT ======
-  const SUPABASE_URL = 'https://omnbbsqeoipykujmlpuy.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9tbmJic3Flb2lweWt1am1scHV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NTIwNTEsImV4cCI6MjEwMDEyODA1MX0.o0_CEyCOXS-pDsucAkpuDHCuWVlfyTnagCv1OeWdWK0';
+  const SUPABASE_URL = 'https://omnbbsqeoipykujmlpuy';
+  const SUPABASE_ANON_KEY = 'eu-west-1';
   // =====================================================================
 
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  let state = { items: [], orders: [] };
+  let state = { items: [], orders: [], categories: [] };
   let ui = { tab: 'dashboard', invSearch: '', invEditing: null, invFormOpen: false, ordFormOpen: false, ordEditing: null };
   let toastTimer = null;
   let currentUser = null;
@@ -177,17 +177,18 @@
   // ---------- Auth ----------
   const loginForm = document.getElementById('sada-login-form');
   const loginError = document.getElementById('sada-login-error');
-    loginForm.addEventListener('submit', async (e) => {
+  loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     loginError.textContent = '';
     const fd = new FormData(loginForm);
     const email = fd.get('email').trim();
     const password = fd.get('password');
-    const result = await sb.auth.signInWithPassword({ email, password });
-    if (result.error) {
-      loginError.textContent = 'خطأ: ' + result.error.message;
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) {
+      loginError.textContent = 'خطأ: ' + error.message + ' (code: ' + (error.status || error.code || 'n/a') + ')';
     }
   });
+
   async function signOut() {
     await sb.auth.signOut();
   }
@@ -220,21 +221,28 @@
   // ---------- Data layer (Supabase) ----------
   async function loadData() {
     try {
-      const [itemsRes, ordersRes] = await Promise.all([
+      const [itemsRes, ordersRes, catsRes] = await Promise.all([
         sb.from('items').select('*').order('name', { ascending: true }),
         sb.from('orders').select('*, order_items(*)').order('date', { ascending: false }),
+        sb.from('categories').select('*').order('sort_order'),
       ]);
       if (itemsRes.error) throw itemsRes.error;
       if (ordersRes.error) throw ordersRes.error;
 
+      state.categories = catsRes.data || [];
+
       state.items = (itemsRes.data || []).map(i => ({
         id: i.id, name: i.name, size: i.size || '', stock: Number(i.stock) || 0,
         lowStock: Number(i.low_stock) || 0, costPrice: Number(i.cost_price) || 0, salePrice: Number(i.sale_price) || 0,
+        description: i.description || '', category: i.category || '', is_active: !!i.is_active,
+        images: Array.isArray(i.images) ? i.images : (i.images ? (() => { try { return JSON.parse(i.images); } catch(e){ return []; } })() : []),
       }));
 
       state.orders = (ordersRes.data || []).map(o => ({
         id: o.id, customerName: o.customer_name, status: o.status, date: o.date, notes: o.notes || '',
-        total: Number(o.total) || 0,
+        total: Number(o.total) || 0, source: o.source || 'staff',
+        paymentMethod: o.payment_method || 'cod', paymentStatus: o.payment_status || 'pending',
+        shippingAddress: o.shipping_address || '', shippingCity: o.shipping_city || '', shippingPhone: o.shipping_phone || '',
         items: (o.order_items || []).map(li => ({
           id: li.id, itemId: li.item_id, itemName: li.item_name, qty: Number(li.qty) || 0,
           unitPrice: Number(li.unit_price) || 0, lineTotal: Number(li.line_total) || 0,
@@ -404,7 +412,9 @@
   }
 
   function renderInventoryForm(editing) {
-    const v = editing || { name:'', size:'', stock:0, lowStock:5, costPrice:0, salePrice:0 };
+    const v = editing || { name:'', size:'', stock:0, lowStock:5, costPrice:0, salePrice:0, description:'', category:'', images:[], is_active:false };
+    const imagesStr = Array.isArray(v.images) ? v.images.join(', ') : (v.images || '');
+    const catOptions = (state.categories||[]).map(c => `<option value="${c.slug}" ${c.slug===v.category?'selected':''}>${escapeHtml(c.name)}</option>`).join('');
     return `
       <form id="inv-form" style="background:var(--surface-2); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px;">
         <div class="sada-form-grid">
@@ -414,7 +424,13 @@
           <div class="sada-field"><label>حد التنبيه للمخزون المنخفض</label><input name="lowStock" type="number" step="1" min="0" value="${v.lowStock}" /></div>
           <div class="sada-field"><label>سعر التكلفة</label><input name="costPrice" type="number" step="0.01" min="0" value="${v.costPrice}" /></div>
           <div class="sada-field"><label>سعر البيع</label><input name="salePrice" type="number" step="0.01" min="0" value="${v.salePrice}" /></div>
+          <div class="sada-field"><label>الفئة (للمتجر)</label><select name="category"><option value="">بدون فئة</option>${catOptions}</select></div>
+          <div class="sada-field"><label>عرض في متجر العملاء؟</label>
+            <select name="isActive"><option value="false" ${!v.is_active?'selected':''}>مخفي (مخزون داخلي فقط)</option><option value="true" ${v.is_active?'selected':''}>ظاهر للعملاء</option></select>
+          </div>
         </div>
+        <div class="sada-field"><label>وصف المنتج (يظهر للعميل في المتجر)</label><textarea name="description" rows="2" style="width:100%; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; color:var(--cream); padding:9px 10px; font-size:13.5px;">${escapeHtml(v.description||'')}</textarea></div>
+        <div class="sada-field"><label>روابط صور المنتج (افصل بينها بفاصلة ,)</label><input name="images" value="${escapeAttr(imagesStr)}" placeholder="https://example.com/img1.jpg, https://example.com/img2.jpg" /></div>
         <div class="sada-form-actions">
           <button type="submit" class="sada-btn">${editing ? 'حفظ التعديلات' : 'إضافة الصنف'}</button>
           <button type="button" class="sada-btn secondary" id="inv-form-cancel">إلغاء</button>
@@ -446,15 +462,20 @@
         <div class="sada-table-wrap">
           ${sorted.length === 0 ? `<div class="sada-empty">لا توجد طلبات بعد — أضف أول طلب للبدء.</div>` : `
           <table class="sada-table">
-            <thead><tr><th>العميل</th><th>الأصناف</th><th>الإجمالي</th><th>الحالة</th><th>التاريخ</th><th></th></tr></thead>
+            <thead><tr><th>المصدر</th><th>العميل</th><th>الأصناف</th><th>الإجمالي</th><th>الدفع</th><th>الحالة</th><th>التاريخ</th><th></th></tr></thead>
             <tbody>
               ${sorted.map(o => {
                 const lines = getOrderItems(o);
+                const sourceBadge = o.source === 'online' ? '<span class="sada-pill pill-ok">أونلاين</span>' : '<span class="sada-pill pill-dim">يدوي</span>';
+                const payLabel = o.paymentMethod === 'fawry' ? 'فوري' : 'عند الاستلام';
+                const payBadge = o.paymentStatus === 'paid' ? `<span class="sada-pill pill-ok">${payLabel} - مدفوع</span>` : `<span class="sada-pill pill-warn">${payLabel} - غير مدفوع</span>`;
                 return `
                 <tr>
+                  <td>${sourceBadge}</td>
                   <td class="sada-name-cell">${escapeHtml(o.customerName)}</td>
                   <td>${lines.map(l => `${escapeHtml(l.itemName)} <span class="sada-muted">× ${fmt(l.qty)}</span>`).join('<br>')}</td>
                   <td>${fmt(o.total)}</td>
+                  <td>${payBadge}</td>
                   <td>
                     <select data-ord-status="${o.id}" class="sada-search" style="min-width:120px; padding:5px 8px; font-size:12px;">
                       ${Object.keys(STATUS_LABELS).map(s => `<option value="${s}" ${s===o.status?'selected':''}>${STATUS_LABELS[s]}</option>`).join('')}
@@ -672,6 +693,10 @@
         low_stock: Number(fd.get('lowStock')) || 0,
         cost_price: Number(fd.get('costPrice')) || 0,
         sale_price: Number(fd.get('salePrice')) || 0,
+        description: (fd.get('description')||'').trim(),
+        category: fd.get('category') || '',
+        is_active: fd.get('isActive') === 'true',
+        images: (fd.get('images')||'').split(',').map(s=>s.trim()).filter(Boolean),
       };
       let error;
       if (ui.invEditing) {

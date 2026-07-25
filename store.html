@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>صدى للعطور — المتجر</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+  :root {
+    --gold: #B8862E;
+    --gold-dim: #8A6521;
+    --emerald: #0F2E24;
+    --emerald-2: #163C2F;
+    --emerald-3: #1E4C3C;
+    --cream: #F3EAD9;
+    --cream-dim: #D9CBAE;
+    --text: #F3EAD9;
+
+    --text-dim: #B6C4BC;
+    --line: #2A4C3E;
+    --danger: #C1584D;
+    --success: #6FA37A;
+    --warning: #D9A441;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+    background: var(--emerald); color: var(--text); direction: rtl;
+  }
+  a { color: inherit; text-decoration: none; }
+  button { font-family: inherit; cursor: pointer; }
+  input, select, textarea { font-family: inherit; }
+
+  .free-ship-banner {
+    background: var(--gold); color: #241A0E; text-align: center;
+    font-size: 13px; font-weight: 700; padding: 8px;
+  }
+  header.store-header {
+    display: flex; align-items: center; gap: 20px; padding: 16px 24px;
+    background: var(--emerald-2); border-bottom: 1px solid var(--line);
+    position: sticky; top: 0; z-index: 50; flex-wrap: wrap;
+  }
+  .store-logo { font-size: 24px; font-weight: 800; color: var(--gold); }
+  .store-nav { display: flex; gap: 18px; margin-inline-start: auto; flex-wrap: wrap; font-size: 14px; }
+  .store-nav a { padding: 6px 4px; color: var(--text-dim); }
+  .store-nav a:hover, .store-nav a.active { color: var(--gold); }
+  .cart-badge {
+    background: var(--gold); color: #241A0E; border-radius: 100px;
+    font-size: 11px; font-weight: 800; padding: 1px 7px; margin-inline-start: 4px;
+  }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+
+  /* Hero */
+  .hero {
+    background: linear-gradient(135deg, var(--emerald-3), var(--emerald-2));
+    border: 1px solid var(--line); border-radius: 18px; padding: 50px 36px;
+    margin-bottom: 32px; text-align: center;
+  }
+  .hero h1 { color: var(--gold); font-size: 32px; margin: 0 0 10px; }
+  .hero p { color: var(--text-dim); font-size: 15px; margin: 0 0 20px; }
+  .btn {
+    display: inline-block; background: var(--gold); color: #241A0E; border: none;
+    border-radius: 8px; padding: 11px 22px; font-weight: 700; font-size: 14px;
+  }
+  .btn.secondary { background: transparent; border: 1px solid var(--gold); color: var(--gold); }
+  .btn.danger { background: var(--danger); color: #fff; }
+  .btn.small { padding: 6px 12px; font-size: 12.5px; border-radius: 6px; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .section-title { color: var(--gold); font-size: 20px; font-weight: 800; margin: 0 0 18px; }
+
+  /* Categories grid */
+  .cat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: 14px; margin-bottom: 40px; }
+  .cat-card {
+    background: var(--emerald-2); border: 1px solid var(--line); border-radius: 14px;
+    padding: 26px 14px; text-align: center; font-weight: 700; transition: transform .15s, border-color .15s;
+  }
+  .cat-card:hover { transform: translateY(-3px); border-color: var(--gold-dim); }
+
+  /* Product grid */
+  .prod-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px,1fr)); gap: 18px; margin-bottom: 30px; }
+  .prod-card {
+    background: var(--emerald-2); border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .prod-img { width: 100%; aspect-ratio: 1; background: var(--emerald-3); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .prod-img img { width: 100%; height: 100%; object-fit: cover; }
+  .prod-body { padding: 12px 14px 16px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  .prod-name { font-weight: 700; font-size: 14.5px; }
+  .prod-size { color: var(--text-dim); font-size: 12px; }
+  .prod-price { color: var(--gold); font-weight: 800; font-size: 16px; margin-top: auto; }
+  .out-of-stock-badge {
+    position: absolute; top: 10px; right: 10px; background: var(--danger); color: #fff;
+    font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 100px;
+  }
+  .prod-card.oos .prod-img { filter: grayscale(1) brightness(0.6); }
+  .prod-card-wrap { position: relative; }
+
+  /* Filters bar */
+  .filters-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; }
+  .filter-btn {
+    background: var(--emerald-2); border: 1px solid var(--line); color: var(--text-dim);
+    padding: 7px 14px; border-radius: 100px; font-size: 12.5px;
+  }
+  .filter-btn.active { border-color: var(--gold); color: var(--gold); }
+
+  /* Product detail */
+  .pd-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 34px; margin-bottom: 40px; }
+  @media (max-width: 720px) { .pd-grid { grid-template-columns: 1fr; } }
+  .pd-main-img { width: 100%; aspect-ratio: 1; background: var(--emerald-2); border-radius: 14px; overflow: hidden; border: 1px solid var(--line); }
+  .pd-main-img img { width: 100%; height: 100%; object-fit: cover; }
+  .pd-thumbs { display: flex; gap: 8px; margin-top: 10px; }
+  .pd-thumb { width: 60px; height: 60px; border-radius: 8px; overflow: hidden; border: 2px solid var(--line); cursor: pointer; }
+  .pd-thumb.active { border-color: var(--gold); }
+  .pd-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .pd-title { font-size: 26px; font-weight: 800; color: var(--cream); margin: 0 0 6px; }
+  .pd-price { font-size: 24px; color: var(--gold); font-weight: 800; margin: 10px 0; }
+  .size-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0; }
+  .size-pill { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--line); background: var(--emerald-2); font-size: 13px; }
+  .size-pill.active { border-color: var(--gold); color: var(--gold); font-weight: 700; }
+  .qty-stepper { display: flex; align-items: center; gap: 10px; margin: 16px 0; }
+  .qty-stepper button { width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line); background: var(--emerald-2); color: var(--text); font-size: 16px; }
+  .stars { color: var(--gold); font-size: 14px; }
+  .review-card { border-bottom: 1px solid var(--line); padding: 14px 0; }
+
+  /* Cart */
+  .cart-row { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+  .cart-row img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; background: var(--emerald-2); }
+  .cart-summary { background: var(--emerald-2); border: 1px solid var(--line); border-radius: 14px; padding: 20px; margin-top: 20px; }
+  .summary-line { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; color: var(--text-dim); }
+  .summary-line.total { color: var(--cream); font-weight: 800; font-size: 18px; border-top: 1px solid var(--line); margin-top: 8px; padding-top: 12px; }
+
+  /* Forms */
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 12.5px; color: var(--text-dim); margin-bottom: 6px; }
+  .field input, .field select, .field textarea {
+    width: 100%; background: var(--emerald-2); border: 1px solid var(--line); border-radius: 8px;
+    color: var(--text); padding: 10px 12px; font-size: 14px;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--gold-dim); }
+  .payment-option { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); background: var(--emerald-2); border-radius: 10px; padding: 14px; margin-bottom: 10px; cursor: pointer; }
+  .payment-option.active { border-color: var(--gold); }
+
+  .auth-card { max-width: 420px; margin: 40px auto; background: var(--emerald-2); border: 1px solid var(--line); border-radius: 16px; padding: 30px; }
+  .auth-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+  .auth-tab { flex: 1; text-align: center; padding: 10px; border-radius: 8px; background: var(--emerald-3); color: var(--text-dim); font-weight: 700; }
+  .auth-tab.active { background: var(--gold); color: #241A0E; }
+
+  /* Account */
+  .acct-tabs { display: flex; gap: 6px; margin-bottom: 24px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .acct-tab { background: none; border: none; color: var(--text-dim); padding: 10px 16px; font-weight: 700; border-bottom: 2px solid transparent; }
+  .acct-tab.active { color: var(--gold); border-color: var(--gold); }
+  .status-pill { padding: 3px 10px; border-radius: 100px; font-size: 11.5px; font-weight: 700; }
+  .st-new { background: rgba(217,164,65,0.18); color: var(--warning); }
+  .st-processing { background: rgba(184,134,46,0.18); color: var(--gold); }
+  .st-shipped { background: rgba(111,163,122,0.18); color: var(--success); }
+  .st-delivered { background: rgba(111,163,122,0.25); color: var(--success); }
+  .st-cancelled { background: rgba(193,88,77,0.18); color: var(--danger); }
+
+  /* Order tracking */
+  .track-line { display: flex; justify-content: space-between; position: relative; margin: 40px 0; }
+  .track-line::before { content: ''; position: absolute; top: 15px; right: 5%; left: 5%; height: 3px; background: var(--line); }
+  .track-step { position: relative; text-align: center; flex: 1; z-index: 1; }
+  .track-dot { width: 32px; height: 32px; border-radius: 50%; background: var(--emerald-2); border: 3px solid var(--line); margin: 0 auto 8px; display: flex; align-items: center; justify-content: center; }
+  .track-step.done .track-dot { background: var(--gold); border-color: var(--gold); }
+  .track-step span { font-size: 12px; color: var(--text-dim); }
+  .track-step.done span { color: var(--gold); font-weight: 700; }
+
+  footer.store-footer { background: var(--emerald-2); border-top: 1px solid var(--line); padding: 40px 24px; margin-top: 50px; }
+  .footer-grid { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap: 24px; }
+  .footer-grid h4 { color: var(--gold); font-size: 14px; margin: 0 0 12px; }
+  .footer-grid a, .footer-grid p { display: block; color: var(--text-dim); font-size: 13px; margin-bottom: 8px; }
+  .newsletter-box { display: flex; gap: 8px; }
+  .newsletter-box input { flex: 1; }
+
+  .empty-state { text-align: center; color: var(--text-dim); padding: 60px 20px; }
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--emerald-3);
+    border: 1px solid var(--gold-dim); color: var(--text); padding: 10px 20px; border-radius: 100px;
+    font-size: 13px; z-index: 999; display: none;
+  }
+</style>
+</head>
+<body>
+<div class="free-ship-banner">🚚 شحن مجاني للطلبات فوق 1000 جنيه</div>
+<header class="store-header">
+  <a href="#home" class="store-logo">صدى للعطور</a>
+  <nav class="store-nav" id="store-nav">
+    <a href="#home" data-route="home">الرئيسية</a>
+    <a href="#category/all" data-route="category">كل المنتجات</a>
+    <a href="#account" data-route="account">حسابي</a>
+    <a href="#cart" data-route="cart">السلة <span class="cart-badge" id="cart-count">0</span></a>
+  </nav>
+</header>
+<main class="container" id="app-root">
+  <div class="empty-state">جارٍ التحميل...</div>
+</main>
+<footer class="store-footer">
+  <div class="footer-grid">
+    <div>
+      <h4>صدى للعطور</h4>
+      <p>عطور فاخرة تدوم أثراً وتترك صدى.</p>
+    </div>
+    <div>
+      <h4>روابط مهمة</h4>
+      <a href="#" data-info="returns">سياسة الاسترجاع</a>
+      <a href="#" data-info="shipping">سياسة الشحن</a>
+      <a href="#" data-info="terms">الشروط والأحكام</a>
+      <a href="#" data-info="contact">تواصل معنا</a>
+    </div>
+    <div>
+      <h4>النشرة البريدية</h4>
+      <p>اشترك واحصل على خصم 10% على أول طلب</p>
+      <div class="newsletter-box">
+        <input type="email" id="newsletter-email" placeholder="بريدك الإلكتروني" />
+        <button class="btn small" id="newsletter-btn">اشتراك</button>
+      </div>
+    </div>
+  </div>
+</footer>
+<div class="toast" id="toast"></div>
+
+<script>
+(function() {
+  // ====== CONFIGURE THESE TWO VALUES FROM YOUR SUPABASE PROJECT (same as index.html) ======
+  // ====== لصق مفتاح anon key فقط - الرابط بقى تلقائي عن طريق البروكسي ======
+  const SUPABASE_URL = window.location.origin + '/supabase';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9tbmJic3Flb2lweWt1am1scHV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NTIwNTEsImV4cCI6MjEwMDEyODA1MX0.o0_CEyCOXS-pDsucAkpuDHCuWVlfyTnagCv1OeWdWK0';
+  // ==========================================================================================
+
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const root = document.getElementById('app-root');
+  const SHIP_FEE = 50;
+  const FREE_SHIP_THRESHOLD = 1000;
+
+  const STATUS_LABELS = { new: 'جديد', processing: 'قيد التجهيز', shipped: 'تم الشحن', delivered: 'تم التسليم', cancelled: 'ملغي' };
+
+  let state = { items: [], categories: [], currentUser: null, profile: null };
+  let cart = [];
+  try { cart = JSON.parse(localStorage.getItem('sada-store-cart') || '[]'); } catch (e) { cart = []; }
+
+  function saveCart() {
+    localStorage.setItem('sada-store-cart', JSON.stringify(cart));
+    updateCartBadge();
+  }
+  function updateCartBadge() {
+    const count = cart.reduce((s, l) => s + l.qty, 0);
+    document.getElementById('cart-count').textContent = count;
+  }
+  function toast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.style.display = 'block';
+    clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = 'none', 2200);
+  }
+  function fmt(n) { return (Number(n) || 0).toLocaleString('en-US', { maximumFractionDigits: 2 }); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function firstImg(item) {
+    try { const arr = Array.isArray(item.images) ? item.images : JSON.parse(item.images || '[]'); return arr[0] || ''; }
+    catch (e) { return ''; }
+  }
+  function allImgs(item) {
+    try { return Array.isArray(item.images) ? item.images : JSON.parse(item.images || '[]'); }
+    catch (e) { return []; }
+  }
+
+  async function loadData() {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session && session.user) {
+      state.currentUser = session.user;
+      const { data: prof } = await sb.from('customer_profiles').select('*').eq('id', session.user.id).maybeSingle();
+      state.profile = prof;
+    } else {
+      state.currentUser = null; state.profile = null;
+    }
+
+    const [itemsRes, catsRes] = await Promise.all([
+      sb.from('items').select('*').eq('is_active', true).order('name'),
+      sb.from('categories').select('*').order('sort_order'),
+    ]);
+    state.items = itemsRes.data || [];
+    state.categories = catsRes.data || [];
+    updateCartBadge();
+    router();
+  }
+
+  sb.auth.onAuthStateChange(() => { loadData(); });
+
+  // ---------------- Router ----------------
+  function router() {
+    const hash = (location.hash || '#home').slice(1);
+    const [route, param, sub] = hash.split('/');
+    document.querySelectorAll('#store-nav a').forEach(a => a.classList.toggle('active', a.dataset.route === route));
+
+    if (route === 'home') renderHome();
+    else if (route === 'category') renderCategory(param);
+    else if (route === 'product') renderProduct(param);
+    else if (route === 'cart') renderCart();
+    else if (route === 'checkout') renderCheckout();
+    else if (route === 'login') renderAuth('login');
+    else if (route === 'register') renderAuth('register');
+    else if (route === 'account') renderAccount(param || 'orders');
+    else if (route === 'track') renderTrack(param);
+    else if (route === 'order-success') renderOrderSuccess(param);
+    else renderHome();
+  }
+  window.addEventListener('hashchange', router);
+
+  // ---------------- Home ----------------
+  function renderHome() {
+    const bestSellers = state.items.slice(0, 8);
+    root.innerHTML = `
+      <div class="hero">
+        <h1>عطور تدوم أثراً... وتترك صدى</h1>
+        <p>تشكيلة فاخرة من العطور الرجالي والحريمي والعود الأصيل</p>
+        <a href="#category/all" class="btn">تسوق الآن</a>
+      </div>
+      <h2 class="section-title">تسوق حسب الفئة</h2>
+      <div class="cat-grid">
+        ${state.categories.map(c => `<a href="#category/${c.slug}" class="cat-card">${esc(c.name)}</a>`).join('')}
+        <div class="cat-card" style="opacity:0.5;">قريباً: ملايات وبطانيات</div>
+      </div>
+      <h2 class="section-title">الأكثر مبيعاً</h2>
+      <div class="prod-grid">${bestSellers.map(productCard).join('') || '<div class="empty-state">لا توجد منتجات معروضة بعد.</div>'}</div>
+    `;
+    attachGlobal();
+  }
+
+  function productCard(item) {
+    const oos = Number(item.stock) <= 0;
+    return `
+      <a href="#product/${item.id}" class="prod-card-wrap">
+        <div class="prod-card ${oos ? 'oos' : ''}">
+          ${oos ? '<span class="out-of-stock-badge">نفدت الكمية</span>' : ''}
+          <div class="prod-img">${firstImg(item) ? `<img src="${esc(firstImg(item))}" alt="${esc(item.name)}">` : '🌸'}</div>
+          <div class="prod-body">
+            <div class="prod-name">${esc(item.name)}</div>
+            <div class="prod-size">${esc(item.size || '')}</div>
+            <div class="prod-price">${fmt(item.sale_price)} ج.م</div>
+          </div>
+        </div>
+      </a>
+    `;
+  }
+
+  // ---------------- Category ----------------
+  let catFilterPrice = 'all', catSort = 'popular';
+  function renderCategory(slug) {
+    const cat = state.categories.find(c => c.slug === slug);
+    let list = slug === 'all' ? state.items.slice() : state.items.filter(i => i.category === slug);
+
+    if (catFilterPrice === 'lt150') list = list.filter(i => Number(i.sale_price) < 150);
+    else if (catFilterPrice === '150to300') list = list.filter(i => Number(i.sale_price) >= 150 && Number(i.sale_price) <= 300);
+    else if (catFilterPrice === 'gt300') list = list.filter(i => Number(i.sale_price) > 300);
+
+    if (catSort === 'price_asc') list.sort((a,b) => a.sale_price - b.sale_price);
+    else if (catSort === 'price_desc') list.sort((a,b) => b.sale_price - a.sale_price);
+
+    root.innerHTML = `
+      <h2 class="section-title">${cat ? esc(cat.name) : 'كل المنتجات'}</h2>
+      <div class="filters-bar">
+        <button class="filter-btn ${catFilterPrice==='all'?'active':''}" data-price="all">كل الأسعار</button>
+        <button class="filter-btn ${catFilterPrice==='lt150'?'active':''}" data-price="lt150">أقل من 150</button>
+        <button class="filter-btn ${catFilterPrice==='150to300'?'active':''}" data-price="150to300">150-300</button>
+        <button class="filter-btn ${catFilterPrice==='gt300'?'active':''}" data-price="gt300">أكتر من 300</button>
+        <select id="sort-select" style="margin-inline-start:auto; background:var(--emerald-2); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:7px 10px;">
+          <option value="popular" ${catSort==='popular'?'selected':''}>الأكثر رواجاً</option>
+          <option value="price_asc" ${catSort==='price_asc'?'selected':''}>السعر: من الأقل</option>
+          <option value="price_desc" ${catSort==='price_desc'?'selected':''}>السعر: من الأعلى</option>
+        </select>
+      </div>
+      <div class="prod-grid">${list.map(productCard).join('') || '<div class="empty-state">لا توجد منتجات مطابقة.</div>'}</div>
+    `;
+    root.querySelectorAll('[data-price]').forEach(b => b.addEventListener('click', () => { catFilterPrice = b.dataset.price; renderCategory(slug); }));
+    const sortSel = root.querySelector('#sort-select');
+    if (sortSel) sortSel.addEventListener('change', () => { catSort = sortSel.value; renderCategory(slug); });
+    attachGlobal();
+  }
+
+  // ---------------- Product detail ----------------
+  let activeImgIdx = 0;
+  async function renderProduct(id) {
+    const item = state.items.find(i => i.id === id);
+    if (!item) { root.innerHTML = '<div class="empty-state">المنتج غير موجود.</div>'; return; }
+    activeImgIdx = 0;
+    const siblings = state.items.filter(i => i.name === item.name);
+    const imgs = allImgs(item);
+    const oos = Number(item.stock) <= 0;
+
+    const { data: reviews } = await sb.from('reviews').select('*').eq('item_id', id).order('created_at', { ascending: false });
+    const avg = reviews && reviews.length ? (reviews.reduce((s,r)=>s+r.rating,0)/reviews.length) : 0;
+
+    root.innerHTML = `
+      <div class="pd-grid">
+        <div>
+          <div class="pd-main-img" id="pd-main-img">${imgs[0] ? `<img src="${esc(imgs[0])}">` : '<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:60px;">🌸</div>'}</div>
+          ${imgs.length > 1 ? `<div class="pd-thumbs">${imgs.map((im,i)=>`<div class="pd-thumb ${i===0?'active':''}" data-idx="${i}"><img src="${esc(im)}"></div>`).join('')}</div>` : ''}
+        </div>
+        <div>
+          <h1 class="pd-title">${esc(item.name)}</h1>
+          <div class="stars">${'★'.repeat(Math.round(avg))}${'☆'.repeat(5-Math.round(avg))} <span style="color:var(--text-dim);">(${reviews ? reviews.length : 0} تقييم)</span></div>
+          <div class="pd-price">${fmt(item.sale_price)} ج.م</div>
+          ${oos ? '<div style="color:var(--danger); font-weight:700; margin-bottom:10px;">نفدت الكمية حالياً</div>' : ''}
+          ${siblings.length > 1 ? `<div class="size-row">${siblings.map(s => `<a href="#product/${s.id}" class="size-pill ${s.id===item.id?'active':''}">${esc(s.size||'-')}</a>`).join('')}</div>` : ''}
+          <p style="color:var(--text-dim); line-height:1.8; font-size:14px;">${esc(item.description || 'لا يوجد وصف لهذا المنتج بعد.')}</p>
+          <div class="qty-stepper">
+            <button id="qty-minus">-</button>
+            <span id="qty-val">1</span>
+            <button id="qty-plus">+</button>
+          </div>
+          <button class="btn" id="add-to-cart-btn" ${oos ? 'disabled' : ''}>${oos ? 'نفدت الكمية' : 'أضف إلى السلة'}</button>
+        </div>
+      </div>
+      <h2 class="section-title">آراء العملاء</h2>
+      <div id="reviews-list">
+        ${reviews && reviews.length ? reviews.map(r => `
+          <div class="review-card">
+            <div style="font-weight:700;">${esc(r.customer_name)} <span class="stars">${'★'.repeat(r.rating)}</span></div>
+            <div style="color:var(--text-dim); font-size:13.5px; margin-top:4px;">${esc(r.comment)}</div>
+          </div>
+        `).join('') : '<div class="empty-state">لا توجد تقييمات بعد. كن أول من يقيّم هذا المنتج.</div>'}
+      </div>
+      ${state.currentUser ? `
+        <div style="margin-top:20px; background:var(--emerald-2); border:1px solid var(--line); border-radius:12px; padding:18px;">
+          <div style="font-weight:700; margin-bottom:10px;">أضف تقييمك</div>
+          <div class="size-row" id="rating-picker">${[1,2,3,4,5].map(n=>`<button type="button" class="size-pill" data-star="${n}">${n} ★</button>`).join('')}</div>
+          <textarea id="review-comment" placeholder="اكتب رأيك..." rows="3" style="width:100%; background:var(--emerald-3); border:1px solid var(--line); border-radius:8px; color:var(--text); padding:10px; margin-bottom:10px;"></textarea>
+          <button class="btn small" id="submit-review-btn">إرسال التقييم</button>
+        </div>
+      ` : `<div class="empty-state"><a href="#login" style="color:var(--gold);">سجّل دخولك</a> لإضافة تقييم</div>`}
+    `;
+
+    root.querySelectorAll('.pd-thumb').forEach(t => t.addEventListener('click', () => {
+      activeImgIdx = Number(t.dataset.idx);
+      document.getElementById('pd-main-img').innerHTML = `<img src="${esc(imgs[activeImgIdx])}">`;
+      root.querySelectorAll('.pd-thumb').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+    }));
+
+    let qty = 1;
+    const qtyVal = document.getElementById('qty-val');
+    document.getElementById('qty-minus').addEventListener('click', () => { if (qty>1) qty--; qtyVal.textContent = qty; });
+    document.getElementById('qty-plus').addEventListener('click', () => { qty++; qtyVal.textContent = qty; });
+    const addBtn = document.getElementById('add-to-cart-btn');
+    if (addBtn) addBtn.addEventListener('click', () => {
+      const existing = cart.find(l => l.itemId === item.id);
+      if (existing) existing.qty += qty;
+      else cart.push({ itemId: item.id, name: item.name, size: item.size, image: imgs[0] || '', unitPrice: Number(item.sale_price)||0, qty });
+      saveCart();
+      toast('تمت الإضافة للسلة');
+    });
+
+    let selectedStar = 0;
+    root.querySelectorAll('[data-star]').forEach(b => b.addEventListener('click', () => {
+      selectedStar = Number(b.dataset.star);
+      root.querySelectorAll('[data-star]').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+    }));
+    const submitReviewBtn = document.getElementById('submit-review-btn');
+    if (submitReviewBtn) submitReviewBtn.addEventListener('click', async () => {
+      if (!selectedStar) { toast('اختر تقييم بالنجوم الأول'); return; }
+      const comment = document.getElementById('review-comment').value.trim();
+      const name = (state.profile && state.profile.full_name) || state.currentUser.email;
+      const { error } = await sb.from('reviews').insert({ item_id: item.id, customer_id: state.currentUser.id, customer_name: name, rating: selectedStar, comment });
+      if (error) { toast('حصل خطأ: ' + error.message); return; }
+      toast('شكراً لتقييمك!');
+      renderProduct(id);
+    });
+    attachGlobal();
+  }
+
+  // ---------------- Cart ----------------
+  function renderCart() {
+    const subtotal = cart.reduce((s,l) => s + l.unitPrice * l.qty, 0);
+    const shipping = subtotal >= FREE_SHIP_THRESHOLD || subtotal === 0 ? 0 : SHIP_FEE;
+    root.innerHTML = `
+      <h2 class="section-title">سلة المشتريات</h2>
+      ${cart.length === 0 ? '<div class="empty-state">السلة فارغة. <a href="#category/all" style="color:var(--gold);">تصفّح المنتجات</a></div>' : `
+        <div>${cart.map((l,idx) => `
+          <div class="cart-row">
+            ${l.image ? `<img src="${esc(l.image)}">` : '<div style="width:64px;height:64px;background:var(--emerald-2);border-radius:8px;"></div>'}
+            <div style="flex:1;">
+              <div style="font-weight:700;">${esc(l.name)}</div>
+              <div style="color:var(--text-dim); font-size:12.5px;">${esc(l.size||'')}</div>
+            </div>
+            <div class="qty-stepper" style="margin:0;">
+              <button data-dec="${idx}">-</button>
+              <span>${l.qty}</span>
+              <button data-inc="${idx}">+</button>
+            </div>
+            <div style="font-weight:700; min-width:80px; text-align:left;">${fmt(l.unitPrice * l.qty)} ج.م</div>
+            <button class="btn danger small" data-remove="${idx}">حذف</button>
+          </div>
+        `).join('')}</div>
+        <div class="cart-summary">
+          <div class="summary-line"><span>المجموع الفرعي</span><span>${fmt(subtotal)} ج.م</span></div>
+          <div class="summary-line"><span>الشحن</span><span>${shipping === 0 ? 'مجاني' : fmt(shipping) + ' ج.م'}</span></div>
+          <div class="summary-line total"><span>الإجمالي</span><span>${fmt(subtotal + shipping)} ج.م</span></div>
+          <a href="#checkout" class="btn" style="width:100%; text-align:center; margin-top:14px; display:block;">إتمام الطلب</a>
+        </div>
+      `}
+    `;
+    root.querySelectorAll('[data-inc]').forEach(b => b.addEventListener('click', () => { cart[b.dataset.inc].qty++; saveCart(); renderCart(); }));
+    root.querySelectorAll('[data-dec]').forEach(b => b.addEventListener('click', () => { const i=b.dataset.dec; if(cart[i].qty>1) cart[i].qty--; else cart.splice(i,1); saveCart(); renderCart(); }));
+    root.querySelectorAll('[data-remove]').forEach(b => b.addEventListener('click', () => { cart.splice(b.dataset.remove,1); saveCart(); renderCart(); }));
+    attachGlobal();
+  }
+
+  // ---------------- Checkout ----------------
+  async function renderCheckout() {
+    if (cart.length === 0) { location.hash = '#cart'; return; }
+    if (!state.currentUser) {
+      root.innerHTML = `<div class="empty-state">لازم تسجّل دخولك الأول لإتمام الطلب. <br><br><a href="#login" class="btn">تسجيل الدخول</a></div>`;
+      return;
+    }
+    const { data: addresses } = await sb.from('addresses').select('*').eq('customer_id', state.currentUser.id);
+    const subtotal = cart.reduce((s,l) => s + l.unitPrice * l.qty, 0);
+    const shipping = subtotal >= FREE_SHIP_THRESHOLD ? 0 : SHIP_FEE;
+
+    root.innerHTML = `
+      <h2 class="section-title">إتمام الطلب</h2>
+      <div style="display:grid; grid-template-columns:1.3fr 1fr; gap:30px;" id="checkout-grid">
+        <div>
+          <h3 style="color:var(--cream);">بيانات التوصيل</h3>
+          ${addresses && addresses.length ? `
+            <div class="field"><label>اختر عنوان محفوظ</label>
+              <select id="saved-address">
+                <option value="">عنوان جديد</option>
+                ${addresses.map(a => `<option value="${a.id}">${esc(a.label)} - ${esc(a.full_address)}, ${esc(a.city)}</option>`).join('')}
+              </select>
+            </div>` : ''}
+          <div class="field"><label>الاسم الكامل *</label><input id="ck-name" value="${esc((state.profile&&state.profile.full_name)||'')}" required /></div>
+          <div class="field"><label>رقم الهاتف *</label><input id="ck-phone" value="${esc((state.profile&&state.profile.phone)||'')}" required /></div>
+          <div class="field"><label>المدينة *</label><input id="ck-city" required /></div>
+          <div class="field"><label>العنوان بالتفصيل *</label><textarea id="ck-address" rows="2" required></textarea></div>
+
+          <h3 style="color:var(--cream); margin-top:24px;">طريقة الدفع</h3>
+          <div class="payment-option active" data-method="cod">
+            <input type="radio" name="pm" checked /> <div><strong>الدفع عند الاستلام</strong><div style="font-size:12px;color:var(--text-dim);">ادفع نقداً عند وصول الطلب</div></div>
+          </div>
+          <div class="payment-option" data-method="fawry">
+            <input type="radio" name="pm" /> <div><strong>فوري</strong><div style="font-size:12px;color:var(--text-dim);">ادفع أونلاين عن طريق فوري</div></div>
+          </div>
+        </div>
+        <div>
+          <div class="cart-summary">
+            <div class="summary-line"><span>المجموع الفرعي</span><span>${fmt(subtotal)} ج.م</span></div>
+            <div class="summary-line"><span>الشحن</span><span>${shipping===0?'مجاني':fmt(shipping)+' ج.م'}</span></div>
+            <div class="summary-line total"><span>الإجمالي</span><span>${fmt(subtotal+shipping)} ج.م</span></div>
+            <button class="btn" id="place-order-btn" style="width:100%; margin-top:14px;">تأكيد الطلب</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    let paymentMethod = 'cod';
+    root.querySelectorAll('.payment-option').forEach(el => el.addEventListener('click', () => {
+      root.querySelectorAll('.payment-option').forEach(x => x.classList.remove('active'));
+      el.classList.add('active');
+      el.querySelector('input').checked = true;
+      paymentMethod = el.dataset.method;
+    }));
+
+    const savedSel = document.getElementById('saved-address');
+    if (savedSel) savedSel.addEventListener('change', () => {
+      const addr = addresses.find(a => a.id === savedSel.value);
+      if (addr) {
+        document.getElementById('ck-phone').value = addr.phone;
+        document.getElementById('ck-city').value = addr.city;
+        document.getElementById('ck-address').value = addr.full_address;
+      }
+    });
+
+    document.getElementById('place-order-btn').addEventListener('click', async () => {
+      const name = document.getElementById('ck-name').value.trim();
+      const phone = document.getElementById('ck-phone').value.trim();
+      const city = document.getElementById('ck-city').value.trim();
+      const address = document.getElementById('ck-address').value.trim();
+      if (!name || !phone || !city || !address) { toast('من فضلك املأ كل البيانات المطلوبة'); return; }
+
+      const btn = document.getElementById('place-order-btn');
+      btn.disabled = true; btn.textContent = 'جارٍ التأكيد...';
+
+      const total = subtotal + shipping;
+      const { data: order, error: orderErr } = await sb.from('orders').insert({
+        customer_name: name, status: 'new', date: new Date().toISOString().slice(0,10), notes: '',
+        total, source: 'online', customer_id: state.currentUser.id,
+        payment_method: paymentMethod, payment_status: 'pending',
+        shipping_address: address, shipping_phone: phone, shipping_city: city,
+      }).select().single();
+
+      if (orderErr || !order) { toast('حصل خطأ: ' + (orderErr?orderErr.message:'')); btn.disabled=false; btn.textContent='تأكيد الطلب'; return; }
+
+      const lines = cart.map(l => ({ order_id: order.id, item_id: l.itemId, item_name: l.name + (l.size?' - '+l.size:''), qty: l.qty, unit_price: l.unitPrice, line_total: l.unitPrice*l.qty }));
+      await sb.from('order_items').insert(lines);
+      for (const l of cart) {
+        const item = state.items.find(i => i.id === l.itemId);
+        if (item) await sb.from('items').update({ stock: Math.max(0, Number(item.stock) - l.qty) }).eq('id', l.itemId);
+      }
+
+      if (paymentMethod === 'fawry') {
+        try {
+          const res = await fetch('/api/fawry-charge', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orderId: order.id, amount: total, customerName: name, customerPhone: phone, customerEmail: state.currentUser.email }),
+          });
+          const data = await res.json();
+          if (data && data.paymentUrl) { window.location.href = data.paymentUrl; return; }
+          toast('تعذر بدء الدفع الإلكتروني، سيتم تحويلك لتأكيد الطلب');
+        } catch (e) { toast('بوابة الدفع غير مفعّلة بعد — سيتم اعتبار الطلب دفع عند الاستلام مؤقتاً'); }
+      }
+
+      cart = []; saveCart();
+      location.hash = '#order-success/' + order.id;
+    });
+    attachGlobal();
+  }
+
+  function renderOrderSuccess(orderId) {
+    root.innerHTML = `
+      <div class="empty-state">
+        <div style="font-size:50px;">✅</div>
+        <h2 style="color:var(--gold);">تم تأكيد طلبك بنجاح</h2>
+        <p>شكراً لثقتك في صدى للعطور. رقم طلبك: ${esc(orderId).slice(0,8)}</p>
+        <a href="#track/${orderId}" class="btn">تتبع الطلب</a>
+        <a href="#home" class="btn secondary" style="margin-inline-start:10px;">متابعة التسوق</a>
+      </div>
+    `;
+  }
+
+  // ---------------- Auth ----------------
+  function renderAuth(mode) {
+    root.innerHTML = `
+      <div class="auth-card">
+        <div class="auth-tabs">
+          <a href="#login" class="auth-tab ${mode==='login'?'active':''}">تسجيل الدخول</a>
+          <a href="#register" class="auth-tab ${mode==='register'?'active':''}">حساب جديد</a>
+        </div>
+        <form id="auth-form">
+          ${mode==='register' ? `<div class="field"><label>الاسم الكامل</label><input name="fullName" required /></div>` : ''}
+          <div class="field"><label>البريد الإلكتروني</label><input type="email" name="email" required /></div>
+          <div class="field"><label>كلمة المرور</label><input type="password" name="password" required minlength="6" /></div>
+          <button type="submit" class="btn" style="width:100%;">${mode==='login'?'دخول':'إنشاء الحساب'}</button>
+          <div id="auth-error" style="color:var(--danger); font-size:13px; margin-top:10px;"></div>
+        </form>
+      </div>
+    `;
+    document.getElementById('auth-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const email = fd.get('email').trim(), password = fd.get('password');
+      const errEl = document.getElementById('auth-error');
+      if (mode === 'login') {
+        const { error } = await sb.auth.signInWithPassword({ email, password });
+        if (error) { errEl.textContent = 'خطأ: ' + error.message; return; }
+        location.hash = '#account';
+      } else {
+        const fullName = fd.get('fullName').trim();
+        const { data, error } = await sb.auth.signUp({ email, password });
+        if (error) { errEl.textContent = 'خطأ: ' + error.message; return; }
+        if (data.user) await sb.from('customer_profiles').insert({ id: data.user.id, full_name: fullName });
+        location.hash = '#account';
+      }
+    });
+  }
+
+  // ---------------- Account ----------------
+  let acctTab = 'orders';
+  async function renderAccount(tab) {
+    if (!state.currentUser) { location.hash = '#login'; return; }
+    acctTab = tab;
+    root.innerHTML = `
+      <h2 class="section-title">حسابي</h2>
+      <div class="acct-tabs">
+        <button class="acct-tab ${acctTab==='info'?'active':''}" data-t="info">بياناتي</button>
+        <button class="acct-tab ${acctTab==='orders'?'active':''}" data-t="orders">طلباتي</button>
+        <button class="acct-tab ${acctTab==='addresses'?'active':''}" data-t="addresses">العناوين</button>
+        <button class="acct-tab ${acctTab==='favorites'?'active':''}" data-t="favorites">المفضلة</button>
+        <button class="acct-tab" id="logout-btn">تسجيل الخروج</button>
+      </div>
+      <div id="acct-body">جارٍ التحميل...</div>
+    `;
+    root.querySelectorAll('.acct-tab[data-t]').forEach(b => b.addEventListener('click', () => renderAccount(b.dataset.t)));
+    document.getElementById('logout-btn').addEventListener('click', async () => { await sb.auth.signOut(); location.hash = '#home'; });
+
+    const body = document.getElementById('acct-body');
+    if (acctTab === 'info') {
+      body.innerHTML = `
+        <div class="field"><label>الاسم الكامل</label><input id="info-name" value="${esc((state.profile&&state.profile.full_name)||'')}" /></div>
+        <div class="field"><label>رقم الهاتف</label><input id="info-phone" value="${esc((state.profile&&state.profile.phone)||'')}" /></div>
+        <div class="field"><label>البريد الإلكتروني</label><input value="${esc(state.currentUser.email)}" disabled /></div>
+        <button class="btn" id="save-info-btn">حفظ</button>
+      `;
+      document.getElementById('save-info-btn').addEventListener('click', async () => {
+        const full_name = document.getElementById('info-name').value.trim();
+        const phone = document.getElementById('info-phone').value.trim();
+        await sb.from('customer_profiles').upsert({ id: state.currentUser.id, full_name, phone });
+        toast('تم الحفظ'); loadData();
+      });
+    } else if (acctTab === 'orders') {
+      const { data: orders } = await sb.from('orders').select('*').eq('customer_id', state.currentUser.id).order('date', { ascending: false });
+      body.innerHTML = (orders && orders.length) ? orders.map(o => `
+        <div class="cart-row" style="cursor:pointer;" data-order="${o.id}">
+          <div style="flex:1;">
+            <div style="font-weight:700;">طلب #${o.id.slice(0,8)}</div>
+            <div style="color:var(--text-dim); font-size:12.5px;">${o.date} — ${fmt(o.total)} ج.م</div>
+          </div>
+          <span class="status-pill st-${o.status}">${STATUS_LABELS[o.status]||o.status}</span>
+        </div>
+      `).join('') : '<div class="empty-state">لا توجد طلبات بعد.</div>';
+      body.querySelectorAll('[data-order]').forEach(r => r.addEventListener('click', () => location.hash = '#track/' + r.dataset.order));
+    } else if (acctTab === 'addresses') {
+      const { data: addresses } = await sb.from('addresses').select('*').eq('customer_id', state.currentUser.id);
+      body.innerHTML = `
+        <div id="addr-list">${(addresses||[]).map(a => `
+          <div class="cart-row">
+            <div style="flex:1;"><strong>${esc(a.label)}</strong><div style="color:var(--text-dim); font-size:13px;">${esc(a.full_address)}, ${esc(a.city)} — ${esc(a.phone)}</div></div>
+            <button class="btn danger small" data-del-addr="${a.id}">حذف</button>
+          </div>
+        `).join('') || '<div class="empty-state">لا توجد عناوين محفوظة.</div>'}</div>
+        <div style="margin-top:20px; background:var(--emerald-2); padding:16px; border-radius:12px;">
+          <div class="field"><label>اسم العنوان (مثال: المنزل)</label><input id="new-addr-label" /></div>
+          <div class="field"><label>المدينة</label><input id="new-addr-city" /></div>
+          <div class="field"><label>الهاتف</label><input id="new-addr-phone" /></div>
+          <div class="field"><label>العنوان بالتفصيل</label><textarea id="new-addr-full" rows="2"></textarea></div>
+          <button class="btn small" id="add-addr-btn">إضافة عنوان</button>
+        </div>
+      `;
+      body.querySelectorAll('[data-del-addr]').forEach(b => b.addEventListener('click', async () => { await sb.from('addresses').delete().eq('id', b.dataset.delAddr); renderAccount('addresses'); }));
+      document.getElementById('add-addr-btn').addEventListener('click', async () => {
+        const label = document.getElementById('new-addr-label').value.trim() || 'المنزل';
+        const city = document.getElementById('new-addr-city').value.trim();
+        const phone = document.getElementById('new-addr-phone').value.trim();
+        const full_address = document.getElementById('new-addr-full').value.trim();
+        if (!city || !phone || !full_address) { toast('املأ كل الحقول'); return; }
+        await sb.from('addresses').insert({ customer_id: state.currentUser.id, label, city, phone, full_address });
+        renderAccount('addresses');
+      });
+    } else if (acctTab === 'favorites') {
+      const { data: favs } = await sb.from('favorites').select('item_id').eq('customer_id', state.currentUser.id);
+      const favItems = (favs||[]).map(f => state.items.find(i => i.id === f.item_id)).filter(Boolean);
+      body.innerHTML = `<div class="prod-grid">${favItems.map(productCard).join('') || '<div class="empty-state">لا توجد منتجات مفضلة بعد.</div>'}</div>`;
+    }
+  }
+
+  // ---------------- Order tracking ----------------
+  async function renderTrack(orderId) {
+    const { data: order } = await sb.from('orders').select('*').eq('id', orderId).maybeSingle();
+    if (!order) { root.innerHTML = '<div class="empty-state">الطلب غير موجود.</div>'; return; }
+    const stages = ['new','processing','shipped','delivered'];
+    const currentIdx = order.status === 'cancelled' ? -1 : stages.indexOf(order.status);
+    const stageLabels = ['تأكيد الطلب','جاري التجهيز','قيد الشحن','تم التوصيل'];
+
+    root.innerHTML = `
+      <h2 class="section-title">تتبع الطلب #${orderId.slice(0,8)}</h2>
+      ${order.status === 'cancelled' ? '<div class="empty-state" style="color:var(--danger);">تم إلغاء هذا الطلب.</div>' : `
+        <div class="track-line">
+          ${stageLabels.map((label,i) => `
+            <div class="track-step ${i<=currentIdx?'done':''}">
+              <div class="track-dot">${i<=currentIdx?'✓':''}</div>
+              <span>${label}</span>
+            </div>
+          `).join('')}
+        </div>
+      `}
+      <div class="cart-summary">
+        <div class="summary-line"><span>الإجمالي</span><span>${fmt(order.total)} ج.م</span></div>
+        <div class="summary-line"><span>طريقة الدفع</span><span>${order.payment_method === 'fawry' ? 'فوري' : 'عند الاستلام'}</span></div>
+        <div class="summary-line"><span>عنوان التوصيل</span><span>${esc(order.shipping_address)}, ${esc(order.shipping_city)}</span></div>
+        ${order.bosta_tracking_number ? `<div class="summary-line"><span>رقم تتبع الشحن</span><span>${esc(order.bosta_tracking_number)}</span></div>` : ''}
+      </div>
+    `;
+  }
+
+  // ---------------- Footer / global ----------------
+  const INFO_TEXT = {
+    returns: 'يمكن استرجاع أي منتج خلال 14 يوماً من الاستلام بشرط أن يكون في حالته الأصلية.',
+    shipping: 'الشحن لكل محافظات مصر خلال 2-5 أيام عمل. شحن مجاني للطلبات فوق 1000 جنيه.',
+    terms: 'باستخدامك للموقع فإنك توافق على شروط الاستخدام وسياسة الخصوصية الخاصة بصدى للعطور.',
+    contact: 'للتواصل معنا: عبر واتساب أو البريد الإلكتروني الموضح في صفحة حسابي.',
+  };
+  function attachGlobal() {
+    document.querySelectorAll('footer [data-info]').forEach(a => {
+      a.onclick = (e) => { e.preventDefault(); alert(INFO_TEXT[a.dataset.info] || ''); };
+    });
+  }
+  const nlBtn = document.getElementById('newsletter-btn');
+  if (nlBtn) nlBtn.addEventListener('click', () => {
+    const email = document.getElementById('newsletter-email').value.trim();
+    if (email) { toast('تم الاشتراك! كود الخصم: SADA10'); document.getElementById('newsletter-email').value = ''; }
+  });
+  document.querySelectorAll('footer [data-info]').forEach(a => {
+    a.addEventListener('click', (e) => { e.preventDefault(); alert(INFO_TEXT[a.dataset.info] || ''); });
+  });
+
+  loadData();
+})();
+</script>
+</body>
+</html>

@@ -148,13 +148,13 @@
   // ====== CONFIGURE THESE TWO VALUES FROM YOUR SUPABASE PROJECT ======
   // ====== لصق مفتاح anon key فقط - الرابط بقى تلقائي عن طريق البروكسي ======
   const SUPABASE_URL = window.location.origin + '/supabase';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9tbmJic3Flb2lweWt1am1scHV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NTIwNTEsImV4cCI6MjEwMDEyODA1MX0.o0_CEyCOXS-pDsucAkpuDHCuWVlfyTnagCv1OeWdWK0';
+  const SUPABASE_ANON_KEY = 'PASTE_YOUR_SUPABASE_ANON_KEY_HERE';
   // =====================================================================
 
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   let state = { items: [], orders: [], categories: [] };
-  let ui = { tab: 'dashboard', invSearch: '', invEditing: null, invFormOpen: false, ordFormOpen: false, ordEditing: null };
+  let ui = { tab: 'dashboard', invSearch: '', invEditingName: null, invFormOpen: false, ordFormOpen: false, ordEditing: null };
   let toastTimer = null;
   let currentUser = null;
 
@@ -366,7 +366,7 @@
   function renderInventory() {
     const search = ui.invSearch.trim().toLowerCase();
     const filtered = state.items.filter(i => !search || i.name.toLowerCase().includes(search));
-    const editing = ui.invEditing ? state.items.find(i => i.id === ui.invEditing) : null;
+    const editingGroup = ui.invEditingName !== undefined && ui.invEditingName !== null ? ui.invEditingName : null;
     const onlineOrdersCount = state.orders.filter(o => o.source === 'online').length;
     const pendingOnlineCount = state.orders.filter(o => o.source === 'online' && (o.status === 'new' || o.status === 'processing')).length;
 
@@ -385,12 +385,12 @@
             <button class="sada-btn secondary" id="inv-template-btn">تنزيل نموذج إكسل</button>
             <button class="sada-btn secondary" id="inv-import-btn">استيراد من إكسل</button>
             <input type="file" id="inv-import-input" accept=".xlsx,.xls" style="display:none" />
-            <button class="sada-btn" id="inv-add-btn">${ui.invFormOpen && !ui.invEditing ? 'إغلاق' : '+ إضافة صنف'}</button>
+            <button class="sada-btn" id="inv-add-btn">${ui.invFormOpen && editingGroup === null ? 'إغلاق' : '+ إضافة صنف'}</button>
           </div>
         </div>
         <div class="sada-muted" style="font-size:12px; margin:-6px 0 14px;">الاستيراد بيضيف الكميات لأي صنف موجود بنفس الاسم والحجم، ويُنشئ صنف جديد لو مش موجود.</div>
 
-        ${(ui.invFormOpen || editing) ? renderInventoryForm(editing) : ''}
+        ${(ui.invFormOpen || editingGroup) ? renderInventoryForm(editingGroup) : ''}
 
         <div class="sada-table-wrap">
           ${filtered.length === 0 ? `<div class="sada-empty">${state.items.length===0 ? 'لا توجد أصناف بعد — أضف أول صنف للبدء.' : 'لا توجد نتائج مطابقة.'}</div>` : `
@@ -419,10 +419,9 @@
                         <button class="sada-btn ${i.is_active ? '' : 'secondary'} small" data-toggle-active="${i.id}" data-current="${i.is_active ? '1' : '0'}">${i.is_active ? '👁 ظاهر' : '🚫 مخفي'}</button>
                       </td>
                       <td>
-                        <div class="sada-row-actions">
-                          <button class="sada-btn secondary small" data-inv-edit="${i.id}">تعديل</button>
-                          <button class="sada-btn danger small" data-inv-del="${i.id}">حذف</button>
-                        </div>
+                        ${idx === 0 ? `<div class="sada-row-actions">
+                          <button class="sada-btn secondary small" data-inv-edit-group="${escapeAttr(name)}">تعديل المنتج${group.length>1?' والأحجام':''}</button>
+                        </div>` : ''}
                       </td>
                     </tr>`;
                   });
@@ -438,27 +437,26 @@
   }
 
   let invFormImages = [];
-  function renderInventoryForm(editing) {
-    const v = editing || { name:'', size:'', stock:0, lowStock:5, costPrice:0, salePrice:0, description:'', category:'', images:[], is_active:false };
-    invFormImages = Array.isArray(v.images) ? [...v.images] : [];
-    const catOptions = (state.categories||[]).map(c => `<option value="${c.slug}" ${c.slug===v.category?'selected':''}>${escapeHtml(c.name)}</option>`).join('');
+  function renderInventoryForm(groupName) {
+    const groupItems = groupName ? state.items.filter(i => i.name === groupName) : [];
+    const shared = groupItems[0] || { name:'', description:'', category:'', images:[], is_active:false };
+    invFormImages = Array.isArray(shared.images) ? [...shared.images] : [];
+    const catOptions = (state.categories||[]).map(c => `<option value="${c.slug}" ${c.slug===shared.category?'selected':''}>${escapeHtml(c.name)}</option>`).join('');
+    const sizeRows = groupItems.length ? groupItems : [{ id:'', size:'', stock:0, lowStock:5, costPrice:0, salePrice:0 }];
+
     return `
       <form id="inv-form" style="background:var(--surface-2); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px;">
         <div class="sada-form-grid">
-          <div class="sada-field"><label>اسم الصنف *</label><input name="name" required value="${escapeAttr(v.name)}" placeholder="مثال: عود ملكي" /></div>
-          <div class="sada-field"><label>الحجم</label><input name="size" value="${escapeAttr(v.size)}" placeholder="مثال: 50 مل" /></div>
-          <div class="sada-field"><label>الكمية المتوفرة</label><input name="stock" type="number" step="1" min="0" value="${v.stock}" /></div>
-          <div class="sada-field"><label>حد التنبيه للمخزون المنخفض</label><input name="lowStock" type="number" step="1" min="0" value="${v.lowStock}" /></div>
-          <div class="sada-field"><label>سعر التكلفة</label><input name="costPrice" type="number" step="0.01" min="0" value="${v.costPrice}" /></div>
-          <div class="sada-field"><label>سعر البيع</label><input name="salePrice" type="number" step="0.01" min="0" value="${v.salePrice}" /></div>
+          <div class="sada-field"><label>اسم المنتج *</label><input name="name" required value="${escapeAttr(shared.name)}" placeholder="مثال: عود ملكي" /></div>
           <div class="sada-field"><label>الفئة (للمتجر)</label><select name="category"><option value="">بدون فئة</option>${catOptions}</select></div>
           <div class="sada-field"><label>عرض في متجر العملاء؟</label>
-            <select name="isActive"><option value="false" ${!v.is_active?'selected':''}>مخفي (مخزون داخلي فقط)</option><option value="true" ${v.is_active?'selected':''}>ظاهر للعملاء</option></select>
+            <select name="isActive"><option value="false" ${!shared.is_active?'selected':''}>مخفي (مخزون داخلي فقط)</option><option value="true" ${shared.is_active?'selected':''}>ظاهر للعملاء</option></select>
           </div>
         </div>
-        <div class="sada-field"><label>وصف المنتج (يظهر للعميل في المتجر)</label><textarea name="description" rows="2" style="width:100%; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; color:var(--cream); padding:9px 10px; font-size:13.5px;">${escapeHtml(v.description||'')}</textarea></div>
+        <div class="sada-field"><label>وصف المنتج (يظهر للعميل في المتجر)</label><textarea name="description" rows="2" style="width:100%; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; color:var(--cream); padding:9px 10px; font-size:13.5px;">${escapeHtml(shared.description||'')}</textarea></div>
+
         <div class="sada-field">
-          <label>صور المنتج</label>
+          <label>صور المنتج (نفس الصور لكل الأحجام)</label>
           <div id="inv-image-previews" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
             ${invFormImages.map((url, i) => `
               <div style="position:relative;" data-img-preview="${i}">
@@ -477,11 +475,33 @@
           <div class="sada-muted" style="font-size:11.5px; margin-top:5px;">تقدر تستخدم رابط جاهز، أو ترفع صورة مباشرة، أو الاتنين مع بعض.</div>
           <div id="inv-upload-status" style="font-size:12px; color:var(--gold); margin-top:5px;"></div>
         </div>
-        <div class="sada-form-actions">
-          <button type="submit" class="sada-btn">${editing ? 'حفظ التعديلات' : 'إضافة الصنف'}</button>
+
+        <div style="margin-top:16px;">
+          <label style="display:block; font-size:12.5px; color:var(--dim); margin-bottom:8px;">الأحجام والكميات</label>
+          <div id="inv-size-rows">
+            ${sizeRows.map(s => invSizeRowHtml(s)).join('')}
+          </div>
+          <button type="button" class="sada-btn secondary small" id="inv-add-size-btn">+ إضافة حجم جديد</button>
+        </div>
+
+        <div class="sada-form-actions" style="margin-top:16px;">
+          <button type="submit" class="sada-btn">${groupItems.length ? 'حفظ كل التعديلات' : 'إضافة المنتج'}</button>
           <button type="button" class="sada-btn secondary" id="inv-form-cancel">إلغاء</button>
         </div>
       </form>
+    `;
+  }
+
+  function invSizeRowHtml(s) {
+    return `
+      <div class="inv-size-row" data-item-id="${s.id||''}" style="display:grid; grid-template-columns: repeat(5, 1fr) auto; gap:8px; align-items:end; margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid var(--line);">
+        <div class="sada-field" style="margin:0;"><label>الحجم</label><input class="sz-size" value="${escapeAttr(s.size||'')}" placeholder="مثال: 50 مل" /></div>
+        <div class="sada-field" style="margin:0;"><label>الكمية المتوفرة</label><input class="sz-stock" type="number" step="1" min="0" value="${s.stock||0}" /></div>
+        <div class="sada-field" style="margin:0;"><label>حد التنبيه</label><input class="sz-lowstock" type="number" step="1" min="0" value="${s.lowStock!==undefined?s.lowStock:5}" /></div>
+        <div class="sada-field" style="margin:0;"><label>سعر التكلفة</label><input class="sz-cost" type="number" step="0.01" min="0" value="${s.costPrice||0}" /></div>
+        <div class="sada-field" style="margin:0;"><label>سعر البيع</label><input class="sz-sale" type="number" step="0.01" min="0" value="${s.salePrice||0}" /></div>
+        <button type="button" class="sada-btn danger small inv-remove-size-btn" title="حذف هذا الحجم" style="height:38px;">×</button>
+      </div>
     `;
   }
 
@@ -703,10 +723,20 @@
   // ---------- Main render ----------
   function render() {
     let body = '';
-    if (ui.tab === 'dashboard') body = renderDashboard();
-    else if (ui.tab === 'inventory') body = renderInventory();
-    else body = renderOrders();
-
+    try {
+      if (ui.tab === 'dashboard') body = renderDashboard();
+      else if (ui.tab === 'inventory') body = renderInventory();
+      else body = renderOrders();
+    } catch (err) {
+      body = `
+        <div style="background:#3A2320; border:1px solid #6B3A33; border-radius:12px; padding:20px; margin-bottom:20px; color:#F3EAD9;">
+          <strong style="color:#E0938A;">حصل خطأ في عرض هذا التبويب:</strong><br/><br/>
+          <code style="white-space:pre-wrap; font-size:13px; color:#F3EAD9;">${escapeHtml(err.message)}</code>
+          <br/><br/>
+          <span class="sada-muted" style="font-size:12px;">ابعت لقطة شاشة من الرسالة دي — البيانات نفسها سليمة في قاعدة البيانات، المشكلة في العرض بس.</span>
+        </div>
+      `;
+    }
     root.innerHTML = renderHeader() + renderTabs() + body;
     attachEvents();
   }
@@ -734,14 +764,14 @@
     }
     const invAddBtn = root.querySelector('#inv-add-btn');
     if (invAddBtn) invAddBtn.addEventListener('click', () => {
-      ui.invEditing = null;
+      ui.invEditingName = null;
       ui.invFormOpen = !ui.invFormOpen;
       render();
     });
     const invSearch = root.querySelector('#inv-search');
     if (invSearch) invSearch.addEventListener('input', (e) => { ui.invSearch = e.target.value; render(); invSearchFocusFix(); });
     const invCancel = root.querySelector('#inv-form-cancel');
-    if (invCancel) invCancel.addEventListener('click', () => { ui.invFormOpen = false; ui.invEditing = null; render(); });
+    if (invCancel) invCancel.addEventListener('click', () => { ui.invFormOpen = false; ui.invEditingName = null; render(); });
 
     root.querySelectorAll('[data-remove-img]').forEach(btn => btn.addEventListener('click', () => {
       const idx = Number(btn.getAttribute('data-remove-img'));
@@ -776,6 +806,28 @@
       urlInput.value = '';
     });
 
+    const sizeRowsWrap = root.querySelector('#inv-size-rows');
+    const addSizeBtn = root.querySelector('#inv-add-size-btn');
+    if (addSizeBtn && sizeRowsWrap) addSizeBtn.addEventListener('click', () => {
+      sizeRowsWrap.insertAdjacentHTML('beforeend', invSizeRowHtml({ id:'', size:'', stock:0, lowStock:5, costPrice:0, salePrice:0 }));
+    });
+    if (sizeRowsWrap) sizeRowsWrap.addEventListener('click', (e) => {
+      if (e.target.classList.contains('inv-remove-size-btn')) {
+        const rowEl = e.target.closest('.inv-size-row');
+        const itemId = rowEl.getAttribute('data-item-id');
+        const rows = sizeRowsWrap.querySelectorAll('.inv-size-row');
+        if (rows.length <= 1) { showToast('لازم يبقى فيه حجم واحد على الأقل'); return; }
+        if (itemId) {
+          if (!confirm('هل تريد حذف هذا الحجم نهائياً من المخزون؟')) return;
+          sb.from('items').delete().eq('id', itemId).then(({ error }) => {
+            if (error) { showToast('تعذر الحذف: ' + error.message); return; }
+            showToast('تم حذف الحجم');
+          });
+        }
+        rowEl.remove();
+      }
+    });
+
     const invForm = root.querySelector('#inv-form');
     if (invForm) invForm.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -797,9 +849,10 @@
         });
       }
 
+      const submitBtn = invForm.querySelector('button[type="submit"]');
+      if (submitBtn) submitBtn.disabled = true;
+
       if (files.length) {
-        const submitBtn = invForm.querySelector('button[type="submit"]');
-        if (submitBtn) submitBtn.disabled = true;
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
           if (statusEl) statusEl.textContent = `جارٍ رفع الصورة ${i + 1} من ${files.length}...`;
@@ -821,32 +874,50 @@
           }
         }
         if (statusEl) statusEl.textContent = '';
-        if (submitBtn) submitBtn.disabled = false;
       }
 
-      const payload = {
+      const sharedPayload = {
         name,
-        size: fd.get('size').trim(),
-        stock: Number(fd.get('stock')) || 0,
-        low_stock: Number(fd.get('lowStock')) || 0,
-        cost_price: Number(fd.get('costPrice')) || 0,
-        sale_price: Number(fd.get('salePrice')) || 0,
         description: (fd.get('description')||'').trim(),
         category: fd.get('category') || '',
         is_active: fd.get('isActive') === 'true',
         images: finalImages,
       };
-      let error;
-      if (ui.invEditing) {
-        ({ error } = await sb.from('items').update(payload).eq('id', ui.invEditing));
-        if (!error) showToast('تم حفظ التعديلات');
-      } else {
-        ({ error } = await sb.from('items').insert(payload));
-        if (!error) showToast('تمت إضافة الصنف');
+
+      let hadError = false;
+      const rowEls = root.querySelectorAll('.inv-size-row');
+      for (const rowEl of rowEls) {
+        const itemId = rowEl.getAttribute('data-item-id');
+        const size = rowEl.querySelector('.sz-size').value.trim();
+        const stock = Number(rowEl.querySelector('.sz-stock').value) || 0;
+        const lowStock = Number(rowEl.querySelector('.sz-lowstock').value) || 0;
+        const costPrice = Number(rowEl.querySelector('.sz-cost').value) || 0;
+        const salePrice = Number(rowEl.querySelector('.sz-sale').value) || 0;
+        if (!size && !itemId) continue; // skip empty unsaved rows
+
+        const rowPayload = {
+          ...sharedPayload,
+          size, stock,
+          low_stock: lowStock,
+          cost_price: costPrice,
+          sale_price: salePrice,
+        };
+
+        let error;
+        if (itemId) {
+          ({ error } = await sb.from('items').update(rowPayload).eq('id', itemId));
+        } else {
+          ({ error } = await sb.from('items').insert(rowPayload));
+        }
+        if (error) { showToast('حصل خطأ: ' + error.message); hadError = true; }
       }
-      if (error) { showToast('حصل خطأ: ' + error.message); return; }
-      ui.invFormOpen = false; ui.invEditing = null;
-      await loadData();
+
+      if (submitBtn) submitBtn.disabled = false;
+      if (!hadError) {
+        showToast(ui.invEditingName ? 'تم حفظ كل التعديلات' : 'تمت إضافة المنتج');
+        ui.invFormOpen = false; ui.invEditingName = null;
+        await loadData();
+      }
     });
     const gotoOrdersLink = root.querySelector('#inv-goto-orders');
     if (gotoOrdersLink) gotoOrdersLink.addEventListener('click', (e) => { e.preventDefault(); ui.tab = 'orders'; render(); });
@@ -860,17 +931,8 @@
       showToast(newVal ? 'الصنف بقى ظاهر للعملاء' : 'الصنف بقى مخفي عن العملاء');
       await loadData();
     }));
-    root.querySelectorAll('[data-inv-edit]').forEach(btn => btn.addEventListener('click', () => {
-      ui.invEditing = btn.getAttribute('data-inv-edit'); ui.invFormOpen = true; render();
-    }));
-    root.querySelectorAll('[data-inv-del]').forEach(btn => btn.addEventListener('click', async () => {
-      const id = btn.getAttribute('data-inv-del');
-      if (confirm('هل تريد حذف هذا الصنف؟')) {
-        const { error } = await sb.from('items').delete().eq('id', id);
-        if (error) { showToast('تعذر الحذف: ' + error.message); return; }
-        showToast('تم حذف الصنف');
-        await loadData();
-      }
+    root.querySelectorAll('[data-inv-edit-group]').forEach(btn => btn.addEventListener('click', () => {
+      ui.invEditingName = btn.getAttribute('data-inv-edit-group'); ui.invFormOpen = true; render();
     }));
 
     // Orders

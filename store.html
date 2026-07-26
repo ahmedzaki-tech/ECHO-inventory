@@ -4,19 +4,22 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>صدى للعطور — المتجر</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
   :root {
-    --gold: #B8862E;
-    --gold-dim: #8A6521;
-    --emerald: #0F2E24;
-    --emerald-2: #163C2F;
-    --emerald-3: #1E4C3C;
-    --cream: #F3EAD9;
-    --cream-dim: #D9CBAE;
-    --text: #F3EAD9;
-    --text-dim: #B6C4BC;
-    --line: #2A4C3E;
+    --gold: #CEB079;
+    --gold-dim: #9A845B;
+    --emerald: #1C4241;
+    --emerald-2: #375958;
+    --emerald-3: #4E6C6B;
+    --cream: #FBF4DF;
+    --cream-dim: #CED0BF;
+    --text: #FBF4DF;
+    --text-dim: #ADB6A8;
+    --line: #607B7A;
     --danger: #C1584D;
     --success: #6FA37A;
     --warning: #D9A441;
@@ -39,7 +42,8 @@
     background: var(--emerald-2); border-bottom: 1px solid var(--line);
     position: sticky; top: 0; z-index: 50; flex-wrap: wrap;
   }
-  .store-logo { font-size: 24px; font-weight: 800; color: var(--gold); }
+  .store-logo { font-size: 24px; font-weight: 800; color: var(--gold); display: flex; align-items: center; }
+  .store-logo img { height: 38px; display: block; }
   .store-nav { display: flex; gap: 18px; margin-inline-start: auto; flex-wrap: wrap; font-size: 14px; }
   .store-nav a { padding: 6px 4px; color: var(--text-dim); }
   .store-nav a:hover, .store-nav a.active { color: var(--gold); }
@@ -57,6 +61,7 @@
     margin-bottom: 32px; text-align: center;
   }
   .hero h1 { color: var(--gold); font-size: 32px; margin: 0 0 10px; }
+  .hero h1, .section-title, .pd-title, .store-logo-text { font-family: 'Cairo', 'Segoe UI', Tahoma, sans-serif; }
   .hero p { color: var(--text-dim); font-size: 15px; margin: 0 0 20px; }
   .btn {
     display: inline-block; background: var(--gold); color: #241A0E; border: none;
@@ -107,6 +112,13 @@
   /* Product detail */
   .pd-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 34px; margin-bottom: 40px; }
   @media (max-width: 720px) { .pd-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 480px) {
+    .cat-grid { grid-template-columns: repeat(2, 1fr); }
+    .prod-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px; }
+    .prod-body { padding: 10px 10px 12px; }
+    .prod-name { font-size: 13px; }
+    .prod-price { font-size: 14px; }
+  }
   .pd-main-img { width: 100%; aspect-ratio: 1; background: var(--emerald-2); border-radius: 14px; overflow: hidden; border: 1px solid var(--line); }
   .pd-main-img img { width: 100%; height: 100%; object-fit: cover; }
   .pd-thumbs { display: flex; gap: 8px; margin-top: 10px; }
@@ -182,9 +194,9 @@
 </style>
 </head>
 <body>
-<div class="free-ship-banner">🚚 شحن مجاني للطلبات فوق 1000 جنيه</div>
+<div class="free-ship-banner">🚚 شحن مجاني للطلبات فوق 1200 جنيه</div>
 <header class="store-header">
-  <a href="#home" class="store-logo">صدى للعطور</a>
+  <a href="#home" class="store-logo"><img src="assets/logo-header.png" alt="صدى للعطور" /></a>
   <nav class="store-nav" id="store-nav">
     <a href="#home" data-route="home">الرئيسية</a>
     <a href="#category/all" data-route="category">كل المنتجات</a>
@@ -231,7 +243,7 @@
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   const root = document.getElementById('app-root');
   const SHIP_FEE = 50;
-  const FREE_SHIP_THRESHOLD = 1000;
+  const FREE_SHIP_THRESHOLD = 1200;
 
   const STATUS_LABELS = { new: 'جديد', processing: 'قيد التجهيز', shipped: 'تم الشحن', delivered: 'تم التسليم', cancelled: 'ملغي' };
 
@@ -305,13 +317,28 @@
   }
   window.addEventListener('hashchange', router);
 
+  function dedupeByName(items) {
+    const groups = new Map();
+    for (const i of items) {
+      if (!groups.has(i.name)) groups.set(i.name, []);
+      groups.get(i.name).push(i);
+    }
+    return Array.from(groups.values()).map(group => {
+      group.sort((a,b) => Number(a.sale_price) - Number(b.sale_price));
+      const rep = group[0];
+      const inStock = group.some(g => Number(g.stock) > 0);
+      const prices = [...new Set(group.map(g => Number(g.sale_price)))];
+      return { ...rep, __multiSize: group.length > 1, __minPrice: prices[0], __anyInStock: inStock };
+    });
+  }
+
   // ---------------- Home ----------------
   function renderHome() {
-    const bestSellers = state.items.slice(0, 8);
+    const bestSellers = dedupeByName(state.items).slice(0, 8);
     root.innerHTML = `
       <div class="hero">
         <h1>عطور تدوم أثراً... وتترك صدى</h1>
-        <p>تشكيلة فاخرة من العطور الرجالي والحريمي والعود الأصيل</p>
+        <p>تشكيلة فاخرة من العطور الرجالي والحريمي والمسك الأصيل</p>
         <a href="#category/all" class="btn">تسوق الآن</a>
       </div>
       <h2 class="section-title">تسوق حسب الفئة</h2>
@@ -325,7 +352,8 @@
   }
 
   function productCard(item) {
-    const oos = Number(item.stock) <= 0;
+    const oos = item.__multiSize ? !item.__anyInStock : Number(item.stock) <= 0;
+    const priceLabel = item.__multiSize ? `يبدأ من ${fmt(item.__minPrice)} ج.م` : `${fmt(item.sale_price)} ج.م`;
     return `
       <a href="#product/${item.id}" class="prod-card-wrap">
         <div class="prod-card ${oos ? 'oos' : ''}">
@@ -333,8 +361,8 @@
           <div class="prod-img">${firstImg(item) ? `<img src="${esc(firstImg(item))}" alt="${esc(item.name)}">` : '🌸'}</div>
           <div class="prod-body">
             <div class="prod-name">${esc(item.name)}</div>
-            <div class="prod-size">${esc(item.size || '')}</div>
-            <div class="prod-price">${fmt(item.sale_price)} ج.م</div>
+            <div class="prod-size">${item.__multiSize ? 'أحجام متعددة' : esc(item.size || '')}</div>
+            <div class="prod-price">${priceLabel}</div>
           </div>
         </div>
       </a>
@@ -345,11 +373,10 @@
   let catFilterPrice = 'all', catSort = 'popular';
   function renderCategory(slug) {
     const cat = state.categories.find(c => c.slug === slug);
-    let list = slug === 'all' ? state.items.slice() : state.items.filter(i => i.category === slug);
+    let list = dedupeByName(slug === 'all' ? state.items.slice() : state.items.filter(i => i.category === slug));
 
-    if (catFilterPrice === 'lt150') list = list.filter(i => Number(i.sale_price) < 150);
-    else if (catFilterPrice === '150to300') list = list.filter(i => Number(i.sale_price) >= 150 && Number(i.sale_price) <= 300);
-    else if (catFilterPrice === 'gt300') list = list.filter(i => Number(i.sale_price) > 300);
+    if (catFilterPrice === 'lt300') list = list.filter(i => Number(i.sale_price) < 300);
+    else if (catFilterPrice === 'gt300') list = list.filter(i => Number(i.sale_price) >= 300);
 
     if (catSort === 'price_asc') list.sort((a,b) => a.sale_price - b.sale_price);
     else if (catSort === 'price_desc') list.sort((a,b) => b.sale_price - a.sale_price);
@@ -358,9 +385,8 @@
       <h2 class="section-title">${cat ? esc(cat.name) : 'كل المنتجات'}</h2>
       <div class="filters-bar">
         <button class="filter-btn ${catFilterPrice==='all'?'active':''}" data-price="all">كل الأسعار</button>
-        <button class="filter-btn ${catFilterPrice==='lt150'?'active':''}" data-price="lt150">أقل من 150</button>
-        <button class="filter-btn ${catFilterPrice==='150to300'?'active':''}" data-price="150to300">150-300</button>
-        <button class="filter-btn ${catFilterPrice==='gt300'?'active':''}" data-price="gt300">أكتر من 300</button>
+        <button class="filter-btn ${catFilterPrice==='lt300'?'active':''}" data-price="lt300">أقل من 300</button>
+        <button class="filter-btn ${catFilterPrice==='gt300'?'active':''}" data-price="gt300">أعلى من 300</button>
         <select id="sort-select" style="margin-inline-start:auto; background:var(--emerald-2); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:7px 10px;">
           <option value="popular" ${catSort==='popular'?'selected':''}>الأكثر رواجاً</option>
           <option value="price_asc" ${catSort==='price_asc'?'selected':''}>السعر: من الأقل</option>
@@ -377,13 +403,18 @@
 
   // ---------------- Product detail ----------------
   let activeImgIdx = 0;
+  let selectedItem = null;
   async function renderProduct(id) {
     const item = state.items.find(i => i.id === id);
     if (!item) { root.innerHTML = '<div class="empty-state">المنتج غير موجود.</div>'; return; }
     activeImgIdx = 0;
-    const siblings = state.items.filter(i => i.name === item.name);
+    selectedItem = item;
+    const siblings = state.items.filter(i => i.name === item.name).sort((a,b) => {
+      const na = parseInt(String(a.size||'').replace(/[^0-9]/g,'')) || 0;
+      const nb = parseInt(String(b.size||'').replace(/[^0-9]/g,'')) || 0;
+      return na - nb;
+    });
     const imgs = allImgs(item);
-    const oos = Number(item.stock) <= 0;
 
     const { data: reviews } = await sb.from('reviews').select('*').eq('item_id', id).order('created_at', { ascending: false });
     const avg = reviews && reviews.length ? (reviews.reduce((s,r)=>s+r.rating,0)/reviews.length) : 0;
@@ -397,16 +428,20 @@
         <div>
           <h1 class="pd-title">${esc(item.name)}</h1>
           <div class="stars">${'★'.repeat(Math.round(avg))}${'☆'.repeat(5-Math.round(avg))} <span style="color:var(--text-dim);">(${reviews ? reviews.length : 0} تقييم)</span></div>
-          <div class="pd-price">${fmt(item.sale_price)} ج.م</div>
-          ${oos ? '<div style="color:var(--danger); font-weight:700; margin-bottom:10px;">نفدت الكمية حالياً</div>' : ''}
-          ${siblings.length > 1 ? `<div class="size-row">${siblings.map(s => `<a href="#product/${s.id}" class="size-pill ${s.id===item.id?'active':''}">${esc(s.size||'-')}</a>`).join('')}</div>` : ''}
+          <div class="pd-price" id="pd-price">${fmt(item.sale_price)} ج.م</div>
+          <div id="pd-oos-msg" style="color:var(--danger); font-weight:700; margin-bottom:10px; ${Number(item.stock)>0?'display:none;':''}">نفدت الكمية حالياً</div>
+          ${siblings.length > 1 ? `
+            <div style="font-size:12.5px; color:var(--text-dim); margin-bottom:6px;">اختر الحجم:</div>
+            <div class="size-row" id="size-row">${siblings.map(s => `<button type="button" class="size-pill ${s.id===item.id?'active':''}" data-item-id="${s.id}" ${Number(s.stock)<=0?'data-oos="1"':''}>${esc(s.size||'-')}</button>`).join('')}</div>
+          ` : ''}
           <p style="color:var(--text-dim); line-height:1.8; font-size:14px;">${esc(item.description || 'لا يوجد وصف لهذا المنتج بعد.')}</p>
           <div class="qty-stepper">
             <button id="qty-minus">-</button>
             <span id="qty-val">1</span>
             <button id="qty-plus">+</button>
           </div>
-          <button class="btn" id="add-to-cart-btn" ${oos ? 'disabled' : ''}>${oos ? 'نفدت الكمية' : 'أضف إلى السلة'}</button>
+          <button class="btn" id="add-to-cart-btn" ${Number(item.stock)<=0 ? 'disabled' : ''}>${Number(item.stock)<=0 ? 'نفدت الكمية' : 'أضف إلى السلة'}</button>
+          <div class="cart-note" style="margin-top:10px; font-size:12px; color:var(--text-dim);">تقدر تضيف أكتر من حجم لنفس المنتج للسلة (مثال: 10 مل + 100 مل مع بعض).</div>
         </div>
       </div>
       <h2 class="section-title">آراء العملاء</h2>
@@ -435,15 +470,31 @@
       t.classList.add('active');
     }));
 
+    // Size selection: switch the "selected" sibling item in-place, no page navigation
+    root.querySelectorAll('#size-row [data-item-id]').forEach(btn => btn.addEventListener('click', () => {
+      const sib = state.items.find(i => i.id === btn.dataset.itemId);
+      if (!sib) return;
+      selectedItem = sib;
+      root.querySelectorAll('#size-row [data-item-id]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('pd-price').textContent = fmt(sib.sale_price) + ' ج.م';
+      const oos = Number(sib.stock) <= 0;
+      document.getElementById('pd-oos-msg').style.display = oos ? 'block' : 'none';
+      const addBtn = document.getElementById('add-to-cart-btn');
+      addBtn.disabled = oos;
+      addBtn.textContent = oos ? 'نفدت الكمية' : 'أضف إلى السلة';
+    }));
+
     let qty = 1;
     const qtyVal = document.getElementById('qty-val');
     document.getElementById('qty-minus').addEventListener('click', () => { if (qty>1) qty--; qtyVal.textContent = qty; });
     document.getElementById('qty-plus').addEventListener('click', () => { qty++; qtyVal.textContent = qty; });
     const addBtn = document.getElementById('add-to-cart-btn');
     if (addBtn) addBtn.addEventListener('click', () => {
-      const existing = cart.find(l => l.itemId === item.id);
+      const chosen = selectedItem;
+      const existing = cart.find(l => l.itemId === chosen.id);
       if (existing) existing.qty += qty;
-      else cart.push({ itemId: item.id, name: item.name, size: item.size, image: imgs[0] || '', unitPrice: Number(item.sale_price)||0, qty });
+      else cart.push({ itemId: chosen.id, name: chosen.name, size: chosen.size, image: imgs[0] || '', unitPrice: Number(chosen.sale_price)||0, qty });
       saveCart();
       toast('تمت الإضافة للسلة');
     });
@@ -773,7 +824,7 @@
   // ---------------- Footer / global ----------------
   const INFO_TEXT = {
     returns: 'يمكن استرجاع أي منتج خلال 14 يوماً من الاستلام بشرط أن يكون في حالته الأصلية.',
-    shipping: 'الشحن لكل محافظات مصر خلال 2-5 أيام عمل. شحن مجاني للطلبات فوق 1000 جنيه.',
+    shipping: 'الشحن لكل محافظات مصر خلال 2-5 أيام عمل. شحن مجاني للطلبات فوق 1200 جنيه.',
     terms: 'باستخدامك للموقع فإنك توافق على شروط الاستخدام وسياسة الخصوصية الخاصة بصدى للعطور.',
     contact: 'للتواصل معنا: عبر واتساب أو البريد الإلكتروني الموضح في صفحة حسابي.',
   };

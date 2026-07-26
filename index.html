@@ -295,6 +295,7 @@
         </div>
         <div class="sada-header-right">
           <div class="sada-user-bar">
+            <a href="/store.html" target="_blank" rel="noopener" class="sada-btn secondary small" title="فتح متجر العملاء في تبويب جديد">🛍️ متجر العملاء</a>
             <span>${currentUser ? escapeHtml(currentUser.email) : ''}</span>
             <button class="sada-btn secondary small" id="sada-logout-btn">خروج</button>
           </div>
@@ -317,6 +318,8 @@
     const invValue = state.items.reduce((s,i) => s + Number(i.stock||0) * Number(i.costPrice||0), 0);
     const lowStock = state.items.filter(i => Number(i.stock) <= Number(i.lowStock||0));
     const pendingOrders = state.orders.filter(o => o.status === 'new' || o.status === 'processing');
+    const onlineOrders = state.orders.filter(o => o.source === 'online');
+    const visibleProducts = state.items.filter(i => i.is_active);
 
     return `
       <div class="sada-grid">
@@ -325,6 +328,8 @@
         <div class="sada-stat"><div class="label">قيمة المخزون (تكلفة)</div><div class="value">${fmt(invValue)}</div></div>
         <div class="sada-stat ${lowStock.length ? 'warn' : ''}"><div class="label">أصناف منخفضة المخزون</div><div class="value">${lowStock.length}</div></div>
         <div class="sada-stat ${pendingOrders.length ? 'warn' : ''}"><div class="label">طلبات قيد التنفيذ</div><div class="value">${pendingOrders.length}</div></div>
+        <div class="sada-stat"><div class="label">طلبات من المتجر (أونلاين)</div><div class="value">${onlineOrders.length}</div></div>
+        <div class="sada-stat"><div class="label">منتجات ظاهرة للعملاء</div><div class="value">${visibleProducts.length}</div></div>
       </div>
 
       <div class="sada-panel">
@@ -362,8 +367,16 @@
     const search = ui.invSearch.trim().toLowerCase();
     const filtered = state.items.filter(i => !search || i.name.toLowerCase().includes(search));
     const editing = ui.invEditing ? state.items.find(i => i.id === ui.invEditing) : null;
+    const onlineOrdersCount = state.orders.filter(o => o.source === 'online').length;
+    const pendingOnlineCount = state.orders.filter(o => o.source === 'online' && (o.status === 'new' || o.status === 'processing')).length;
 
     return `
+      <div style="display:flex; align-items:center; gap:14px; background:var(--surface-2); border:1px solid var(--line); border-radius:10px; padding:12px 16px; margin-bottom:16px;">
+        <span class="sada-muted" style="font-size:13px;">🛒 طلبات المتجر (أونلاين):</span>
+        <strong style="color:var(--gold); font-size:15px;">${onlineOrdersCount}</strong>
+        ${pendingOnlineCount ? `<span class="sada-pill pill-warn">${pendingOnlineCount} قيد التنفيذ</span>` : ''}
+        <a href="#" id="inv-goto-orders" style="margin-inline-start:auto; color:var(--gold); font-size:13px; text-decoration:underline;">عرض الطلبات ←</a>
+      </div>
       <div class="sada-panel">
         <div class="sada-panel-head">
           <h3 class="sada-section-title" style="margin:0;">أصناف المخزون</h3>
@@ -382,7 +395,7 @@
         <div class="sada-table-wrap">
           ${filtered.length === 0 ? `<div class="sada-empty">${state.items.length===0 ? 'لا توجد أصناف بعد — أضف أول صنف للبدء.' : 'لا توجد نتائج مطابقة.'}</div>` : `
           <table class="sada-table">
-            <thead><tr><th>الصنف</th><th>الحجم</th><th>المتوفر</th><th>الحد الأدنى</th><th>سعر التكلفة</th><th>سعر البيع</th><th>الحالة</th><th></th></tr></thead>
+            <thead><tr><th>الصنف</th><th>الحجم</th><th>المتوفر</th><th>الحد الأدنى</th><th>سعر التكلفة</th><th>سعر البيع</th><th>الحالة</th><th>ظاهر للعملاء؟</th><th></th></tr></thead>
             <tbody>
               ${filtered.map(i => {
                 const low = Number(i.stock) <= Number(i.lowStock||0);
@@ -396,6 +409,9 @@
                   <td>${fmt(i.costPrice)}</td>
                   <td>${fmt(i.salePrice)}</td>
                   <td>${pill}</td>
+                  <td>
+                    <button class="sada-btn ${i.is_active ? '' : 'secondary'} small" data-toggle-active="${i.id}" data-current="${i.is_active ? '1' : '0'}">${i.is_active ? '👁 ظاهر' : '🚫 مخفي'}</button>
+                  </td>
                   <td>
                     <div class="sada-row-actions">
                       <button class="sada-btn secondary small" data-inv-edit="${i.id}">تعديل</button>
@@ -823,6 +839,18 @@
       ui.invFormOpen = false; ui.invEditing = null;
       await loadData();
     });
+    const gotoOrdersLink = root.querySelector('#inv-goto-orders');
+    if (gotoOrdersLink) gotoOrdersLink.addEventListener('click', (e) => { e.preventDefault(); ui.tab = 'orders'; render(); });
+
+    root.querySelectorAll('[data-toggle-active]').forEach(btn => btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-toggle-active');
+      const newVal = btn.getAttribute('data-current') !== '1';
+      btn.disabled = true;
+      const { error } = await sb.from('items').update({ is_active: newVal }).eq('id', id);
+      if (error) { showToast('تعذر التحديث: ' + error.message); btn.disabled = false; return; }
+      showToast(newVal ? 'الصنف بقى ظاهر للعملاء' : 'الصنف بقى مخفي عن العملاء');
+      await loadData();
+    }));
     root.querySelectorAll('[data-inv-edit]').forEach(btn => btn.addEventListener('click', () => {
       ui.invEditing = btn.getAttribute('data-inv-edit'); ui.invFormOpen = true; render();
     }));

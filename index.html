@@ -397,29 +397,38 @@
           <table class="sada-table">
             <thead><tr><th>الصنف</th><th>الحجم</th><th>المتوفر</th><th>الحد الأدنى</th><th>سعر التكلفة</th><th>سعر البيع</th><th>الحالة</th><th>ظاهر للعملاء؟</th><th></th></tr></thead>
             <tbody>
-              ${filtered.map(i => {
-                const low = Number(i.stock) <= Number(i.lowStock||0);
-                const out = Number(i.stock) <= 0;
-                const pill = out ? '<span class="sada-pill pill-danger">نفد</span>' : (low ? '<span class="sada-pill pill-warn">منخفض</span>' : '<span class="sada-pill pill-ok">متوفر</span>');
-                return `<tr>
-                  <td class="sada-name-cell">${escapeHtml(i.name)}</td>
-                  <td class="sada-muted">${escapeHtml(i.size||'-')}</td>
-                  <td>${fmt(i.stock)}</td>
-                  <td class="sada-muted">${fmt(i.lowStock)}</td>
-                  <td>${fmt(i.costPrice)}</td>
-                  <td>${fmt(i.salePrice)}</td>
-                  <td>${pill}</td>
-                  <td>
-                    <button class="sada-btn ${i.is_active ? '' : 'secondary'} small" data-toggle-active="${i.id}" data-current="${i.is_active ? '1' : '0'}">${i.is_active ? '👁 ظاهر' : '🚫 مخفي'}</button>
-                  </td>
-                  <td>
-                    <div class="sada-row-actions">
-                      <button class="sada-btn secondary small" data-inv-edit="${i.id}">تعديل</button>
-                      <button class="sada-btn danger small" data-inv-del="${i.id}">حذف</button>
-                    </div>
-                  </td>
-                </tr>`;
-              }).join('')}
+              ${(() => {
+                // تجميع الأصناف بنفس الاسم مع بعض (عرض بصري فقط، كل حجم يفضل صف مستقل في قاعدة البيانات)
+                const groups = new Map();
+                filtered.forEach(i => { if (!groups.has(i.name)) groups.set(i.name, []); groups.get(i.name).push(i); });
+                let rowsHtml = '';
+                for (const [name, group] of groups) {
+                  group.forEach((i, idx) => {
+                    const low = Number(i.stock) <= Number(i.lowStock||0);
+                    const out = Number(i.stock) <= 0;
+                    const pill = out ? '<span class="sada-pill pill-danger">نفد</span>' : (low ? '<span class="sada-pill pill-warn">منخفض</span>' : '<span class="sada-pill pill-ok">متوفر</span>');
+                    rowsHtml += `<tr class="${group.length > 1 ? 'sada-grouped-row' : ''}">
+                      ${idx === 0 ? `<td class="sada-name-cell" rowspan="${group.length}" style="${group.length>1?'border-inline-start:3px solid var(--gold);':''}">${escapeHtml(name)}${group.length>1?` <span class="sada-muted" style="font-size:11px;">(${group.length} أحجام)</span>`:''}</td>` : ''}
+                      <td class="sada-muted">${escapeHtml(i.size||'-')}</td>
+                      <td>${fmt(i.stock)}</td>
+                      <td class="sada-muted">${fmt(i.lowStock)}</td>
+                      <td>${fmt(i.costPrice)}</td>
+                      <td>${fmt(i.salePrice)}</td>
+                      <td>${pill}</td>
+                      <td>
+                        <button class="sada-btn ${i.is_active ? '' : 'secondary'} small" data-toggle-active="${i.id}" data-current="${i.is_active ? '1' : '0'}">${i.is_active ? '👁 ظاهر' : '🚫 مخفي'}</button>
+                      </td>
+                      <td>
+                        <div class="sada-row-actions">
+                          <button class="sada-btn secondary small" data-inv-edit="${i.id}">تعديل</button>
+                          <button class="sada-btn danger small" data-inv-del="${i.id}">حذف</button>
+                        </div>
+                      </td>
+                    </tr>`;
+                  });
+                }
+                return rowsHtml;
+              })()}
             </tbody>
           </table>
           `}
